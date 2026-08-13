@@ -5,6 +5,61 @@ struct Album: Codable, Equatable {
     var defaultPageSize: PageSize
 }
 
+/// One navigable thing on screen: the cover alone, a single page alone, or
+/// a spread rendered as two facing pages (spec §5.3). The canvas and
+/// filmstrip both iterate `Album.units` rather than the raw `pages` array,
+/// so a spread always advances/selects as one step.
+enum PageUnit: Identifiable, Equatable {
+    case single(Page)
+    case spread(left: Page, right: Page)
+
+    var id: String {
+        switch self {
+        case .single(let p): return p.id.uuidString
+        case .spread(let l, let r): return "\(l.id.uuidString)-\(r.id.uuidString)"
+        }
+    }
+
+    var pageIDs: [UUID] {
+        switch self {
+        case .single(let p): return [p.id]
+        case .spread(let l, let r): return [l.id, r.id]
+        }
+    }
+
+    var isSpread: Bool {
+        if case .spread = self { return true }
+        return false
+    }
+}
+
+extension Album {
+    /// Groups the flat `pages` array into navigable units by matching
+    /// consecutive `.spreadLeft`/`.spreadRight` pairs on `spreadID` (spec
+    /// §3.2). A `.spreadLeft` without an immediately-following matching
+    /// `.spreadRight` falls back to rendering as a single page rather than
+    /// crashing — that pairing should never happen given how pages are
+    /// mutated, but this keeps rendering defensive against it.
+    var units: [PageUnit] {
+        var result: [PageUnit] = []
+        var i = 0
+        while i < pages.count {
+            let page = pages[i]
+            if case .spreadLeft(let spreadID) = page.role,
+               i + 1 < pages.count,
+               case .spreadRight(let rightSpreadID) = pages[i + 1].role,
+               rightSpreadID == spreadID {
+                result.append(.spread(left: page, right: pages[i + 1]))
+                i += 2
+            } else {
+                result.append(.single(page))
+                i += 1
+            }
+        }
+        return result
+    }
+}
+
 extension Album {
     /// Builds the starting page set for a new project (spec §4): one cover,
     /// one first single page, then enough spreads to reach

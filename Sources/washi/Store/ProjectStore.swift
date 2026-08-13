@@ -5,6 +5,14 @@ enum ProjectStoreError: Error {
     case noSaveLocation
 }
 
+/// How the canvas should animate into the currently-selected unit — a plain
+/// crossfade for thumbnail jumps, a directional flip for sequential
+/// prev/next navigation (spec §5.4, D8).
+enum NavigationKind: Equatable {
+    case crossfade
+    case flip(FlipDirection)
+}
+
 /// Single source of truth for the currently-open `Project` (spec §2.2).
 ///
 /// `packageURL` is non-nil from the moment a project is created, not only
@@ -19,6 +27,8 @@ final class ProjectStore: ObservableObject {
     @Published private(set) var hasUnsavedChanges: Bool = false
     @Published var selectedPageID: UUID?
     @Published var activeTool: Tool = .select
+    @Published var filmstripMultiSelection: Set<UUID> = []
+    @Published var lastNavigationKind: NavigationKind = .crossfade
 
     private(set) var packageURL: URL
     private(set) var lastSavedURL: URL?
@@ -30,6 +40,7 @@ final class ProjectStore: ObservableObject {
         self.project = project
         self.packageURL = packageURL ?? ProjectStore.makeScratchPackageURL(projectID: project.id)
         self.lastSavedURL = savedURL
+        self.selectedPageID = project.album.pages.first?.id
         let fm = FileManager.default
         try? fm.createDirectory(at: self.packageURL, withIntermediateDirectories: true)
         try? fm.createDirectory(at: ProjectFile.assetsDirectory(in: self.packageURL), withIntermediateDirectories: true)

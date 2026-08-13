@@ -78,6 +78,7 @@ struct WashiWindowView: View {
 private struct EditorView: View {
     @ObservedObject var store: ProjectStore
     var onNew: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,48 +93,68 @@ private struct EditorView: View {
 
             ZStack(alignment: .topLeading) {
                 VStack(spacing: 0) {
-                    CanvasPlaceholderView(pageSize: store.project.album.pages.first?.size ?? .defaultPreset)
+                    canvasArea
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     PageFilmstripView(
-                        unitCount: max(store.project.album.pages.count, 1),
-                        currentIndex: 0,
-                        onSelect: { _ in },
-                        onPrev: {},
-                        onNext: {},
-                        onAddPage: {}
+                        onPrev: { store.goToPreviousUnit() },
+                        onNext: { store.goToNextUnit() }
                     )
 
                     ToolControlBar()
                 }
 
-                ToolRail(activeTool: $store.activeTool, onAddPage: {})
-                    .padding(.leading, 16)
-                    .padding(.top, 16)
+                ToolRail(
+                    activeTool: $store.activeTool,
+                    onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
+                    onAddSpread: { store.addSpread(after: store.selectedPageID) }
+                )
+                .padding(.leading, 16)
+                .padding(.top, 16)
             }
         }
+        .environmentObject(store)
         .background(Color(nsColor: .windowBackgroundColor))
     }
-}
 
-/// Renders at the page's true relative proportions (spec §5.3, §1.1). No
-/// element rendering yet — replaced by `Rendering/PageCanvasView.swift` /
-/// `SpreadView.swift` in M6.
-private struct CanvasPlaceholderView: View {
-    var pageSize: PageSize
+    private var currentTransition: AnyTransition {
+        switch store.lastNavigationKind {
+        case .crossfade: return .pageCrossfade
+        case .flip(let direction): return .pageNavigation(direction: direction, reduceMotion: reduceMotion)
+        }
+    }
 
-    var body: some View {
+    @ViewBuilder
+    private var canvasArea: some View {
         GeometryReader { geo in
-            let aspect = pageSize.widthCm / pageSize.heightCm
-            let maxW = geo.size.width * 0.82
-            let maxH = geo.size.height * 0.88
+            ZStack {
+                if let unit = store.currentUnit {
+                    PageUnitView(unit: unit)
+                        .frame(maxWidth: geo.size.width * 0.82, maxHeight: geo.size.height * 0.88)
+                        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+                        .id(unit.id)
+                        .transition(currentTransition)
+                } else {
+                    emptyAlbumState
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .animation(.pageFlipTiming, value: store.currentUnit?.id)
+        }
+    }
 
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.white)
-                .aspectRatio(aspect, contentMode: .fit)
-                .frame(maxWidth: maxW, maxHeight: maxH)
-                .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
-                .frame(width: geo.size.width, height: geo.size.height)
+    private var emptyAlbumState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "doc.badge.plus")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("No pages")
+                .font(.title3)
+            Menu("Add Page") {
+                Button("Add Single Page") { store.addSinglePage(after: nil) }
+                Button("Add Spread") { store.addSpread(after: nil) }
+            }
+            .fixedSize()
         }
     }
 }
