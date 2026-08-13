@@ -18,6 +18,7 @@ final class ProjectStore: ObservableObject {
     @Published var project: Project
     @Published private(set) var hasUnsavedChanges: Bool = false
     @Published var selectedPageID: UUID?
+    @Published var activeTool: Tool = .select
 
     private(set) var packageURL: URL
     private(set) var lastSavedURL: URL?
