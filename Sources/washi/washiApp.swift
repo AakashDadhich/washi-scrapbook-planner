@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 @main
 struct WashiApp: App {
@@ -115,6 +116,54 @@ private struct EditorView: View {
         }
         .environmentObject(store)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onChange(of: store.activeTool) { _, newTool in
+            if newTool == .addImage {
+                presentImagePicker()
+            }
+        }
+    }
+
+    // MARK: - Add Image (spec §5.2: file picker, or drag-and-drop onto the canvas)
+
+    private func presentImagePicker() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            importAndPlaceImage(from: url)
+        } else {
+            store.activeTool = .select
+        }
+    }
+
+    private func importAndPlaceImage(from url: URL) {
+        guard let pageID = store.selectedPageID else {
+            store.activeTool = .select
+            return
+        }
+        do {
+            let asset = try store.importAsset(from: url)
+            let aspect = asset.pixelSize.height > 0 ? asset.pixelSize.width / asset.pixelSize.height : 1
+            let size = store.page(for: pageID)?.size ?? .defaultPreset
+            let center = CGPoint(x: size.widthCm / 2, y: size.heightCm / 2)
+            store.placeImage(assetID: asset.id, aspect: aspect, onPageID: pageID, atCm: center)
+        } catch {
+            store.activeTool = .select
+        }
+    }
+
+    private func handleCanvasDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+            return false
+        }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+            guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+            Task { @MainActor in
+                importAndPlaceImage(from: url)
+            }
+        }
+        return true
     }
 
     private var currentTransition: AnyTransition {
@@ -134,6 +183,7 @@ private struct EditorView: View {
                         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
                         .id(unit.id)
                         .transition(currentTransition)
+                        .onDrop(of: [.fileURL], isTargeted: nil, perform: handleCanvasDrop)
                 } else {
                     emptyAlbumState
                 }

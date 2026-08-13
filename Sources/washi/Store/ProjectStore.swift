@@ -29,6 +29,7 @@ final class ProjectStore: ObservableObject {
     @Published var activeTool: Tool = .select
     @Published var filmstripMultiSelection: Set<UUID> = []
     @Published var lastNavigationKind: NavigationKind = .crossfade
+    @Published var selectedElementIDs: Set<UUID> = []
 
     private(set) var packageURL: URL
     private(set) var lastSavedURL: URL?
