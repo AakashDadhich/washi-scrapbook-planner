@@ -1,0 +1,165 @@
+import Foundation
+import Combine
+
+enum ProjectStoreError: Error {
+    case noSaveLocation
+}
+
+/// Single source of truth for the currently-open `Project` (spec §2.2).
+///
+/// `packageURL` is non-nil from the moment a project is created, not only
+/// after the user's first explicit save: imported photos are embedded there
+/// immediately (spec §10.1's "copies photo bytes into the package on
+/// import"), initially into a scratch package in the temp directory. The
+/// first Save/Save As copies that whole package to the user's chosen
+/// location and continues working directly out of it from then on.
+@MainActor
+final class ProjectStore: ObservableObject {
+    @Published var project: Project
+    @Published private(set) var hasUnsavedChanges: Bool = false
+    @Published var selectedPageID: UUID?
+
+    private(set) var packageURL: URL
+    private(set) var lastSavedURL: URL?
+
+    private var autosaveTimer: Timer?
+    private let autosaveInterval: TimeInterval = 120
+
+    init(project: Project, packageURL: URL? = nil, alreadySavedAt savedURL: URL? = nil) {
+        self.project = project
+        self.packageURL = packageURL ?? ProjectStore.makeScratchPackageURL(projectID: project.id)
+        self.lastSavedURL = savedURL
+        let fm = FileManager.default
+        try? fm.createDirectory(at: self.packageURL, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: ProjectFile.assetsDirectory(in: self.packageURL), withIntermediateDirectories: true)
+        try? fm.createDirectory(at: ProjectFile.thumbnailsDirectory(in: self.packageURL), withIntermediateDirectories: true)
+        startAutosaveTimer()
+    }
+
+    static func makeScratchPackageURL(projectID: UUID) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("washi-inprogress", isDirectory: true)
+            .appendingPathComponent("\(projectID.uuidString).washi", isDirectory: true)
+    }
+
+    // MARK: - Mutation entry point
+
+    /// Every direct mutation of `project` outside `ProjectStore` should be
+    /// followed by a call to this (or go through `UndoStack`, from M13 on).
+    func markDirty() {
+        hasUnsavedChanges = true
+        project.modifiedAt = Date()
+    }
+
+    // MARK: - Asset import
+
+    @discardableResult
+    func importAsset(from sourceURL: URL) throws -> AssetRecord {
+        let record = try ProjectFile.importAsset(from: sourceURL, into: &project, packageURL: packageURL)
+        markDirty()
+        return record
+    }
+
+    func assetFileURL(for assetID: UUID) -> URL? {
+        guard let record = project.assetManifest[assetID] else { return nil }
+        return packageURL.appendingPathComponent(record.relativePath)
+    }
+
+    // MARK: - Save / Save As (spec §10.2; menu/shortcut wiring lands in M15)
+
+    func save() throws {
+        guard let dest = lastSavedURL else { throw ProjectStoreError.noSaveLocation }
+        try saveInPlace(to: dest)
+    }
+
+    func saveAs(to destinationURL: URL) throws {
+        try saveInPlace(to: destinationURL)
+    }
+
+    private func saveInPlace(to destinationURL: URL) throws {
+        try ProjectFile.write(project: project, to: packageURL)
+        if destinationURL != packageURL {
+            let fm = FileManager.default
+            if fm.fileExists(atPath: destinationURL.path) {
+                try fm.removeItem(at: destinationURL)
+            }
+            try fm.copyItem(at: packageURL, to: destinationURL)
+            packageURL = destinationURL
+        }
+        lastSavedURL = destinationURL
+        hasUnsavedChanges = false
+        clearAutosaveSnapshot()
+    }
+
+    // MARK: - Open
+
+    static func open(packageURL: URL) throws -> ProjectStore {
+        let project = try ProjectFile.read(from: packageURL)
+        return ProjectStore(project: project, packageURL: packageURL, alreadySavedAt: packageURL)
+    }
+
+    // MARK: - Autosave (spec §10.2, §14 edge case 13)
+
+    private func startAutosaveTimer() {
+        autosaveTimer?.invalidate()
+        autosaveTimer = Timer.scheduledTimer(withTimeInterval: autosaveInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.autosaveIfNeeded() }
+        }
+    }
+
+    func autosaveIfNeeded() {
+        guard hasUnsavedChanges else { return }
+        try? writeAutosaveSnapshot()
+    }
+
+    private func autosaveSnapshotDirectory() -> URL {
+        packageURL.appendingPathComponent("Autosave", isDirectory: true)
+    }
+
+    private func autosaveSnapshotURL() -> URL {
+        autosaveSnapshotDirectory().appendingPathComponent(ProjectFile.manifestFilename)
+    }
+
+    func writeAutosaveSnapshot() throws {
+        let dir = autosaveSnapshotDirectory()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(project)
+        try data.write(to: autosaveSnapshotURL(), options: .atomic)
+    }
+
+    func clearAutosaveSnapshot() {
+        try? FileManager.default.removeItem(at: autosaveSnapshotDirectory())
+    }
+
+    /// A pending autosave snapshot newer than the last save, if any.
+    static func pendingAutosaveRecovery(packageURL: URL) -> Project? {
+        let autosaveURL = packageURL.appendingPathComponent("Autosave").appendingPathComponent(ProjectFile.manifestFilename)
+        guard let autosaveAttrs = try? FileManager.default.attributesOfItem(atPath: autosaveURL.path),
+              let autosaveDate = autosaveAttrs[.modificationDate] as? Date else { return nil }
+
+        let manifestURL = ProjectFile.manifestURL(in: packageURL)
+        let savedDate = (try? FileManager.default.attributesOfItem(atPath: manifestURL.path))?[.modificationDate] as? Date
+
+        guard savedDate == nil || autosaveDate > savedDate! else { return nil }
+        guard let data = try? Data(contentsOf: autosaveURL) else { return nil }
+        return try? JSONDecoder().decode(Project.self, from: data)
+    }
+
+    func recoverFromAutosave() {
+        guard let recovered = ProjectStore.pendingAutosaveRecovery(packageURL: packageURL) else { return }
+        project = recovered
+        hasUnsavedChanges = true
+    }
+
+    /// User declined recovery: the snapshot is discarded, not kept around to
+    /// reappear later (spec §14 edge case 13).
+    func discardPendingAutosave() {
+        clearAutosaveSnapshot()
+    }
+
+    deinit {
+        autosaveTimer?.invalidate()
+    }
+}
