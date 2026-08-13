@@ -28,8 +28,12 @@ struct ElementView: View {
 
 /// Positions an element in page space: `Transform2D`'s cm-based
 /// position/size/rotation scaled to the page view's current point size.
+/// Purely a display component — click/drag/double-click interaction is
+/// handled centrally by `PageCanvasView`'s single unified gesture (see
+/// its doc comment for why a per-element gesture doesn't work reliably).
 struct PlacedElementView: View {
     var element: PageElement
+    var pageID: UUID
     var pageSizePt: CGSize
     var pageSizeCm: CGSize
 

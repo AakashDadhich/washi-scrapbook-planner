@@ -113,6 +113,7 @@ private struct EditorView: View {
                 .padding(.leading, 16)
                 .padding(.top, 16)
             }
+            .overlay(selectionShortcuts)
         }
         .environmentObject(store)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -121,6 +122,37 @@ private struct EditorView: View {
                 presentImagePicker()
             }
         }
+    }
+
+    /// Hidden buttons carrying the selection-scoped keyboard shortcuts
+    /// (spec §12): Delete, Cmd+G, Cmd+Shift+G. Not visible chrome — just a
+    /// reliable place to attach `.keyboardShortcut` independent of which
+    /// on-canvas view happens to have focus.
+    private var selectionShortcuts: some View {
+        ZStack {
+            Button("") {
+                if let pageID = store.selectedPageID {
+                    store.deleteSelectedElements(onPageID: pageID)
+                }
+            }
+            .keyboardShortcut(.delete, modifiers: [])
+
+            Button("") {
+                if let pageID = store.selectedPageID {
+                    store.groupSelection(onPageID: pageID)
+                }
+            }
+            .keyboardShortcut("g", modifiers: [.command])
+
+            Button("") {
+                if let pageID = store.selectedPageID {
+                    store.ungroupSelection(onPageID: pageID)
+                }
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
     }
 
     // MARK: - Add Image (spec §5.2: file picker, or drag-and-drop onto the canvas)
