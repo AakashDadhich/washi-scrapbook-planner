@@ -17,3 +17,18 @@ struct Project: Codable, Equatable {
     var album: Album
     var assetManifest: [UUID: AssetRecord]   // every embedded image/sticker, deduplicated by content hash
 }
+
+extension Project {
+    /// Builds a new project per the New Project wizard (spec §4).
+    static func makeNew(name: String, pageSize: PageSize, background: PageBackground, contentPageCount: Int) -> Project {
+        let now = Date()
+        return Project(
+            id: UUID(),
+            name: name,
+            createdAt: now,
+            modifiedAt: now,
+            album: .makeNewAlbum(pageSize: pageSize, background: background, contentPageCount: contentPageCount),
+            assetManifest: [:]
+        )
+    }
+}
