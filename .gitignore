@@ -1,0 +1,4 @@
+.build/
+washi.app/
+.DS_Store
+*.xcuserstate
