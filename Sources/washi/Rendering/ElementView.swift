@@ -4,11 +4,6 @@ import SwiftUI
 /// caller gives it. Positioning/sizing/rotation is applied by the caller
 /// (`PlacedElementView`) via `Transform2D`, so this view never needs to
 /// know its own page-space geometry.
-///
-/// Borders render as a flat stroke for M7 — the real procedural
-/// `BorderPathBuilder` (straight/squiggly/scalloped/zigzag/dashed/double
-/// line) replaces this in M9, applied identically here to photo, text, and
-/// frame elements.
 struct ElementView: View {
     var element: PageElement
 
@@ -48,6 +43,45 @@ struct PlacedElementView: View {
             .frame(width: w, height: h)
             .rotationEffect(.degrees(element.transform.rotationDegrees))
             .position(x: x, y: y)
+    }
+}
+
+// MARK: - Border rendering (spec §3.8, shared by text/image/frame)
+
+/// A SwiftUI `Shape` wrapper around `BorderPathBuilder`'s procedural path
+/// for the wavy/scalloped shapes; `.straight`/`.dashed`/`.doubleLine` use
+/// the plain base perimeter (see `BorderOverlay`).
+private struct BorderShapePath: Shape {
+    var borderShape: BorderShape
+    var cornerStyle: CornerStyle
+
+    func path(in rect: CGRect) -> Path {
+        Path(BorderPathBuilder.strokePath(shape: borderShape, rect: rect, cornerStyle: cornerStyle))
+    }
+}
+
+/// Renders a `BorderStyle` around whatever bounds it's placed in —
+/// identical for a photo, a text box, and a standalone frame (spec §3.8).
+struct BorderOverlay: View {
+    var border: BorderStyle
+
+    var body: some View {
+        switch border.shape {
+        case .dashed(let dashLength, let gapLength):
+            BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
+                .stroke(border.color.color, style: StrokeStyle(lineWidth: border.thickness, dash: [dashLength, gapLength]))
+        case .doubleLine(let gap):
+            ZStack {
+                BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
+                    .stroke(border.color.color, lineWidth: border.thickness)
+                BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
+                    .stroke(border.color.color, lineWidth: border.thickness)
+                    .padding(border.thickness + gap)
+            }
+        default:
+            BorderShapePath(borderShape: border.shape, cornerStyle: border.cornerStyle)
+                .stroke(border.color.color, lineWidth: border.thickness)
+        }
     }
 }
 
@@ -97,7 +131,7 @@ struct TextElementContentView: View {
     @ViewBuilder
     private var borderOverlay: some View {
         if let border = text.border {
-            Rectangle().stroke(border.color.color, lineWidth: border.thickness)
+            BorderOverlay(border: border)
         }
     }
 }
@@ -165,7 +199,7 @@ struct ImageElementContentView: View {
     @ViewBuilder
     private var borderOverlay: some View {
         if let border = image.border {
-            cornerShape.stroke(border.color.color, lineWidth: border.thickness)
+            BorderOverlay(border: border)
         }
     }
 
@@ -223,7 +257,7 @@ struct FrameElementContentView: View {
             if let fill = frame.fill {
                 shape.fill(fill.color)
             }
-            shape.stroke(frame.border.color.color, lineWidth: frame.border.thickness)
+            BorderOverlay(border: frame.border)
         }
     }
 
