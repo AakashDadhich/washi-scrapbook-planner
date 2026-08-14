@@ -3,6 +3,7 @@ import SwiftUI
 /// Floating left toolbar (spec §5.2): one tool active at a time, except
 /// `.addPage` which fires immediately rather than becoming "active".
 struct ToolRail: View {
+    @EnvironmentObject var store: ProjectStore
     @Binding var activeTool: Tool
     var onAddSinglePage: () -> Void
     var onAddSpread: () -> Void
@@ -51,5 +52,32 @@ struct ToolRail: View {
         .background(isActive ? Color.accentColor.opacity(0.25) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         .help(tool.label)
         .keyboardShortcut(tool.shortcutKey, modifiers: [])
+        .modifier(ClipartPopoverIfSticker(tool: tool, activeTool: $activeTool))
+    }
+}
+
+/// Attaches the Clipart panel as a popover only to the Add Sticker button
+/// (spec §7: "opened from the Add Sticker toolbar icon"), open exactly
+/// while that tool is active.
+private struct ClipartPopoverIfSticker: ViewModifier {
+    @EnvironmentObject var store: ProjectStore
+    var tool: Tool
+    @Binding var activeTool: Tool
+
+    func body(content: Content) -> some View {
+        if tool == .addSticker {
+            content.popover(isPresented: Binding(
+                get: { activeTool == .addSticker },
+                set: { if !$0 && activeTool == .addSticker { activeTool = .select } }
+            )) {
+                ClipartPanel { item in
+                    guard let pageID = store.selectedPageID, let center = store.pageCenterCm(onPageID: pageID) else { return }
+                    store.placeClipart(item, onPageID: pageID, atCm: center)
+                    activeTool = .select
+                }
+            }
+        } else {
+            content
+        }
     }
 }

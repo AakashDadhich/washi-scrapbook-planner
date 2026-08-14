@@ -204,6 +204,24 @@ private struct EditorView: View {
         return true
     }
 
+    /// Handles a Clipart panel cell dragged onto the canvas (spec §7):
+    /// the cell's `.onDrag` carries its `ClipartItem.id` as plain text.
+    private func handleClipartDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.text.identifier) }) else {
+            return false
+        }
+        provider.loadObject(ofClass: NSString.self) { reading, _ in
+            guard let idString = reading as? String else { return }
+            Task { @MainActor in
+                guard let pageID = store.selectedPageID,
+                      let item = store.resolveClipartItem(id: idString),
+                      let center = store.pageCenterCm(onPageID: pageID) else { return }
+                store.placeClipart(item, onPageID: pageID, atCm: center)
+            }
+        }
+        return true
+    }
+
     private var currentTransition: AnyTransition {
         switch store.lastNavigationKind {
         case .crossfade: return .pageCrossfade
@@ -222,6 +240,7 @@ private struct EditorView: View {
                         .id(unit.id)
                         .transition(currentTransition)
                         .onDrop(of: [.fileURL], isTargeted: nil, perform: handleCanvasDrop)
+                        .onDrop(of: [.text], isTargeted: nil, perform: handleClipartDrop)
                 } else {
                     emptyAlbumState
                 }

@@ -52,14 +52,6 @@ extension ProjectStore {
         addElement(.frame(frame), center: point, size: CGSize(width: 6, height: 6), toPageID: pageID)
     }
 
-    /// Placeholder placement until the real Clipart panel lands in M12 —
-    /// an unresolvable assetID renders as a placeholder square (see
-    /// `StickerElementContentView`'s fallback), matching the build plan's
-    /// M7 scope note.
-    func placeSticker(onPageID pageID: UUID, atCm point: CGPoint) {
-        addElement(.sticker(StickerElement(assetID: UUID(), tint: pendingStickerTint)), center: point, size: CGSize(width: 4, height: 4), toPageID: pageID)
-    }
-
     func placeImage(assetID: UUID, aspect: CGFloat, onPageID pageID: UUID, atCm point: CGPoint) {
         let width: CGFloat = 10
         let height = width / max(aspect, 0.01)

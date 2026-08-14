@@ -210,8 +210,6 @@ struct PageCanvasView: View {
                 store.placeDefaultText(onPageID: page.id, atCm: cmPoint)
             case .addBorderFrame:
                 store.placeDefaultFrame(onPageID: page.id, atCm: cmPoint)
-            case .addSticker:
-                store.placeSticker(onPageID: page.id, atCm: cmPoint)
             default:
                 break
             }

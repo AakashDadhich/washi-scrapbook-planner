@@ -36,7 +36,12 @@ final class ProjectStore: ObservableObject {
     @Published var pendingTextStyle: TextElement = .makeDefault()
     @Published var pendingImageBorder: BorderStyle?
     @Published var pendingImageTransparent: Bool = false
-    @Published var pendingStickerTint: ColorValue?
+    /// Starter clipart ships as white silhouettes so `StickerElement.tint`
+    /// can recolor them freely (`colorMultiply` only faithfully recolors
+    /// white source pixels) — defaulting this to nil would make a freshly
+    /// placed sticker invisible against a white page until the user
+    /// manually opts into a tint.
+    @Published var pendingStickerTint: ColorValue? = ColorValue(hex: "#E38FB0")
     @Published var pendingFrameBorder: BorderStyle = .defaultStyle
     @Published var pendingFrameFill: ColorValue?
 
