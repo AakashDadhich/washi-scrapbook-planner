@@ -32,6 +32,14 @@ final class ProjectStore: ObservableObject {
     @Published var selectedElementIDs: Set<UUID> = []
     @Published var activeAlignmentGuides: AlignmentGuides = .none
 
+    // Pending style templates for the next placed element (spec §5.2/D12).
+    @Published var pendingTextStyle: TextElement = .makeDefault()
+    @Published var pendingImageBorder: BorderStyle?
+    @Published var pendingImageTransparent: Bool = false
+    @Published var pendingStickerTint: ColorValue?
+    @Published var pendingFrameBorder: BorderStyle = .defaultStyle
+    @Published var pendingFrameFill: ColorValue?
+
     private(set) var packageURL: URL
     private(set) var lastSavedURL: URL?
 

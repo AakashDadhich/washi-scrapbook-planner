@@ -38,12 +38,18 @@ extension ProjectStore {
         return element
     }
 
+    /// Places using `pendingTextStyle` as the template — pre-set by the
+    /// tool control bar the moment Add Text is activated, before anything
+    /// is placed (spec §5.2/D12).
     func placeDefaultText(onPageID pageID: UUID, atCm point: CGPoint) {
-        addElement(.text(.makeDefault()), center: point, size: CGSize(width: 8, height: 3), toPageID: pageID)
+        var text = pendingTextStyle
+        text.string = "Text"
+        addElement(.text(text), center: point, size: CGSize(width: 8, height: 3), toPageID: pageID)
     }
 
     func placeDefaultFrame(onPageID pageID: UUID, atCm point: CGPoint) {
-        addElement(.frame(.makeDefault()), center: point, size: CGSize(width: 6, height: 6), toPageID: pageID)
+        let frame = FrameElement(shape: .rectangle, border: pendingFrameBorder, fill: pendingFrameFill)
+        addElement(.frame(frame), center: point, size: CGSize(width: 6, height: 6), toPageID: pageID)
     }
 
     /// Placeholder placement until the real Clipart panel lands in M12 —
@@ -51,12 +57,15 @@ extension ProjectStore {
     /// `StickerElementContentView`'s fallback), matching the build plan's
     /// M7 scope note.
     func placeSticker(onPageID pageID: UUID, atCm point: CGPoint) {
-        addElement(.sticker(StickerElement(assetID: UUID(), tint: nil)), center: point, size: CGSize(width: 4, height: 4), toPageID: pageID)
+        addElement(.sticker(StickerElement(assetID: UUID(), tint: pendingStickerTint)), center: point, size: CGSize(width: 4, height: 4), toPageID: pageID)
     }
 
     func placeImage(assetID: UUID, aspect: CGFloat, onPageID pageID: UUID, atCm point: CGPoint) {
         let width: CGFloat = 10
         let height = width / max(aspect, 0.01)
-        addElement(.image(.makeDefault(assetID: assetID)), center: point, size: CGSize(width: width, height: height), toPageID: pageID)
+        var image = ImageElement.makeDefault(assetID: assetID)
+        image.border = pendingImageBorder
+        image.backgroundIsTransparent = pendingImageTransparent
+        addElement(.image(image), center: point, size: CGSize(width: width, height: height), toPageID: pageID)
     }
 }
