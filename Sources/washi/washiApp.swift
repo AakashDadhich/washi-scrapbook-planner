@@ -90,6 +90,7 @@ private struct EditorView: View {
     @ObservedObject var store: ProjectStore
     var onNew: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showExportSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -97,7 +98,7 @@ private struct EditorView: View {
                 onNew: onNew,
                 onInfo: {},
                 onSave: {},
-                onExport: {},
+                onExport: { showExportSheet = true },
                 hasUnsavedChanges: store.hasUnsavedChanges,
                 canSaveOrExport: true
             )
@@ -137,6 +138,9 @@ private struct EditorView: View {
             if newTool == .addImage {
                 presentImagePicker()
             }
+        }
+        .sheet(isPresented: $showExportSheet) {
+            ExportSheet()
         }
     }
 
