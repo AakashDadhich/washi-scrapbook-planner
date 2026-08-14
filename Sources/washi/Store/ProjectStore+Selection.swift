@@ -142,6 +142,7 @@ extension ProjectStore {
 
     func endInteraction() {
         activeAlignmentGuides = .none
+        commitGestureCheckpoint()
         markDirty()
     }
 
@@ -220,11 +221,13 @@ extension ProjectStore {
         let deletable = project.album.pages[idx].elements.filter { selectedElementIDs.contains($0.id) && !$0.isLocked }
         guard !deletable.isEmpty else { return }
         let deletableIDs = Set(deletable.map(\.id))
-        project.album.pages[idx].elements.removeAll(where: { deletableIDs.contains($0.id) })
-        project.album.pages[idx].groups = project.album.pages[idx].groups.compactMap { group in
-            var g = group
-            g.elementIDs.removeAll(where: { deletableIDs.contains($0) })
-            return g.elementIDs.count >= 2 ? g : nil
+        withUndoCheckpoint {
+            project.album.pages[idx].elements.removeAll(where: { deletableIDs.contains($0.id) })
+            project.album.pages[idx].groups = project.album.pages[idx].groups.compactMap { group in
+                var g = group
+                g.elementIDs.removeAll(where: { deletableIDs.contains($0) })
+                return g.elementIDs.count >= 2 ? g : nil
+            }
         }
         selectedElementIDs.subtract(deletableIDs)
         markDirty()
@@ -234,8 +237,10 @@ extension ProjectStore {
 
     func setLocked(_ locked: Bool, forElementIDs ids: Set<UUID>, onPageID pageID: UUID) {
         guard let idx = pageIndex(for: pageID) else { return }
-        for i in project.album.pages[idx].elements.indices where ids.contains(project.album.pages[idx].elements[i].id) {
-            project.album.pages[idx].elements[i].isLocked = locked
+        withUndoCheckpoint {
+            for i in project.album.pages[idx].elements.indices where ids.contains(project.album.pages[idx].elements[i].id) {
+                project.album.pages[idx].elements[i].isLocked = locked
+            }
         }
         markDirty()
     }
@@ -246,14 +251,18 @@ extension ProjectStore {
         guard let idx = pageIndex(for: pageID), selectedElementIDs.count > 1 else { return }
         let existingCount = project.album.pages[idx].groups.count
         let group = ElementGroup(id: UUID(), name: "Group \(existingCount + 1)", elementIDs: Array(selectedElementIDs))
-        project.album.pages[idx].groups.append(group)
+        withUndoCheckpoint {
+            project.album.pages[idx].groups.append(group)
+        }
         markDirty()
     }
 
     func ungroupSelection(onPageID pageID: UUID) {
         guard let idx = pageIndex(for: pageID) else { return }
-        project.album.pages[idx].groups.removeAll { group in
-            !Set(group.elementIDs).isDisjoint(with: selectedElementIDs)
+        withUndoCheckpoint {
+            project.album.pages[idx].groups.removeAll { group in
+                !Set(group.elementIDs).isDisjoint(with: selectedElementIDs)
+            }
         }
         markDirty()
     }
@@ -306,13 +315,17 @@ extension ProjectStore {
         guard let idx = pageIndex(for: pageID), !ids.isEmpty else { return }
         var elements = project.album.pages[idx].elements
         mutate(&elements, Array(ids))
-        project.album.pages[idx].elements = elements
+        withUndoCheckpoint {
+            project.album.pages[idx].elements = elements
+        }
         markDirty()
     }
 
     func setZIndex(_ id: UUID, to zIndex: Int, onPageID pageID: UUID) {
         guard let idx = pageIndex(for: pageID), let elIdx = project.album.pages[idx].elements.firstIndex(where: { $0.id == id }) else { return }
-        project.album.pages[idx].elements[elIdx].zIndex = zIndex
+        withUndoCheckpoint {
+            project.album.pages[idx].elements[elIdx].zIndex = zIndex
+        }
         markDirty()
     }
 }

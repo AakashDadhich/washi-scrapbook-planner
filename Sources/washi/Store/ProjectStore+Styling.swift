@@ -18,7 +18,9 @@ extension ProjectStore {
     func updateSelectedElement(_ mutate: (inout PageElement) -> Void) {
         guard let (pageID, element) = singleSelectedElement, let idx = elementIndex(element.id, onPageID: pageID) else { return }
         guard let pIdx = pageIndex(for: pageID) else { return }
-        mutate(&project.album.pages[pIdx].elements[idx])
+        withUndoCheckpoint {
+            mutate(&project.album.pages[pIdx].elements[idx])
+        }
         markDirty()
     }
 
@@ -58,7 +60,9 @@ extension ProjectStore {
 
     func setCurrentPageBackground(_ background: PageBackground) {
         guard let pageID = selectedPageID, let idx = pageIndex(for: pageID) else { return }
-        project.album.pages[idx].background = background
+        withUndoCheckpoint {
+            project.album.pages[idx].background = background
+        }
         markDirty()
     }
 }

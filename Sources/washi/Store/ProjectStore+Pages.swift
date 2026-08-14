@@ -81,8 +81,10 @@ extension ProjectStore {
             groups: [],
             pageNumber: nil
         )
-        project.album.pages.insert(newPage, at: insertIndex)
-        renumberPages()
+        withUndoCheckpoint {
+            project.album.pages.insert(newPage, at: insertIndex)
+            renumberPages()
+        }
         selectedPageID = newPage.id
         filmstripMultiSelection.removeAll()
         markDirty()
@@ -94,8 +96,10 @@ extension ProjectStore {
         let background = defaultBackgroundForNewPage()
         let left = Page(id: UUID(), role: .spreadLeft(spreadID: spreadID), size: project.album.defaultPageSize, background: background, elements: [], groups: [], pageNumber: nil)
         let right = Page(id: UUID(), role: .spreadRight(spreadID: spreadID), size: project.album.defaultPageSize, background: background, elements: [], groups: [], pageNumber: nil)
-        project.album.pages.insert(contentsOf: [left, right], at: insertIndex)
-        renumberPages()
+        withUndoCheckpoint {
+            project.album.pages.insert(contentsOf: [left, right], at: insertIndex)
+            renumberPages()
+        }
         selectedPageID = left.id
         filmstripMultiSelection.removeAll()
         markDirty()
@@ -134,9 +138,11 @@ extension ProjectStore {
         let wasSelectionAffected = idsToRemove.contains(selectedPageID ?? UUID())
         let removedAt = project.album.pages.firstIndex(where: { idsToRemove.contains($0.id) })
 
-        project.album.pages.removeAll(where: { idsToRemove.contains($0.id) })
+        withUndoCheckpoint {
+            project.album.pages.removeAll(where: { idsToRemove.contains($0.id) })
+            renumberPages()
+        }
         filmstripMultiSelection.subtract(idsToRemove)
-        renumberPages()
 
         if wasSelectionAffected {
             if let removedAt {
@@ -163,9 +169,11 @@ extension ProjectStore {
               case .singlePage = pages[i2].role else { return }
 
         let spreadID = UUID()
-        project.album.pages[i1].role = .spreadLeft(spreadID: spreadID)
-        project.album.pages[i2].role = .spreadRight(spreadID: spreadID)
-        renumberPages()
+        withUndoCheckpoint {
+            project.album.pages[i1].role = .spreadLeft(spreadID: spreadID)
+            project.album.pages[i2].role = .spreadRight(spreadID: spreadID)
+            renumberPages()
+        }
         selectedPageID = project.album.pages[i1].id
         filmstripMultiSelection.removeAll()
         markDirty()
@@ -174,17 +182,19 @@ extension ProjectStore {
     /// The inverse of merge: re-tags both pages back to `.singlePage` and
     /// clears the shared `spreadID`. Never re-lays-out content.
     func splitSpread(spreadID: UUID) {
-        for i in project.album.pages.indices {
-            switch project.album.pages[i].role {
-            case .spreadLeft(let sid) where sid == spreadID:
-                project.album.pages[i].role = .singlePage
-            case .spreadRight(let sid) where sid == spreadID:
-                project.album.pages[i].role = .singlePage
-            default:
-                break
+        withUndoCheckpoint {
+            for i in project.album.pages.indices {
+                switch project.album.pages[i].role {
+                case .spreadLeft(let sid) where sid == spreadID:
+                    project.album.pages[i].role = .singlePage
+                case .spreadRight(let sid) where sid == spreadID:
+                    project.album.pages[i].role = .singlePage
+                default:
+                    break
+                }
             }
+            renumberPages()
         }
-        renumberPages()
         markDirty()
     }
 
@@ -211,8 +221,10 @@ extension ProjectStore {
         }
 
         pages.insert(contentsOf: movingPages, at: insertAt)
-        project.album.pages = pages
-        renumberPages()
+        withUndoCheckpoint {
+            project.album.pages = pages
+            renumberPages()
+        }
         markDirty()
     }
 

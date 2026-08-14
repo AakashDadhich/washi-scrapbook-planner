@@ -15,6 +15,16 @@ struct WashiApp: App {
         }
         .windowStyle(.titleBar)
         .windowResizability(.contentSize)
+        .commands {
+            // SwiftUI's default Edit menu ships its own Undo/Redo bound to
+            // Cmd+Z/Cmd+Shift+Z, wired to the responder chain's
+            // NSUndoManager rather than `ProjectStore.undo()`/`redo()` —
+            // left in place, it intermittently intercepts the keystroke
+            // before our shortcut buttons see it (spec §8's undo lives in
+            // `UndoStack`, not an `NSUndoManager`). Replacing it with an
+            // empty group removes the competing claimant.
+            CommandGroup(replacing: .undoRedo) {}
+        }
     }
 }
 
@@ -136,6 +146,15 @@ private struct EditorView: View {
     /// on-canvas view happens to have focus.
     private var selectionShortcuts: some View {
         ZStack {
+            Button("") { store.undo() }
+                .keyboardShortcut("z", modifiers: [.command])
+
+            Button("") { store.redo() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+
+            Button("") { store.redo() }
+                .keyboardShortcut("y", modifiers: [.command])
+
             Button("") {
                 if let pageID = store.selectedPageID {
                     store.deleteSelectedElements(onPageID: pageID)

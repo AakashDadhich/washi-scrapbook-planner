@@ -114,6 +114,7 @@ struct PageCanvasView: View {
             let rotationHandlePt = rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: 0, height: -bounds.height / 2 - 22))
             if distance(locationPt, rotationHandlePt) < handleHitRadius {
                 interaction = .rotate
+                store.beginGestureSnapshot()
                 rotateStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
                 let cmBounds = store.combinedUnrotatedBounds(store.selectedElementIDs, onPageID: page.id) ?? .zero
                 rotateCenterCm = CGPoint(x: cmBounds.midX, y: cmBounds.midY)
@@ -125,6 +126,7 @@ struct PageCanvasView: View {
                 let hp = rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: h.handleUnit.x * bounds.width, height: h.handleUnit.y * bounds.height))
                 if distance(locationPt, hp) < handleHitRadius {
                     interaction = .resize(h)
+                    store.beginGestureSnapshot()
                     resizeStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
                     resizeStartBounds = store.combinedUnrotatedBounds(store.selectedElementIDs, onPageID: page.id) ?? .zero
                     return
@@ -148,6 +150,7 @@ struct PageCanvasView: View {
                     store.beginElementInteraction(clickedID: hit.id, onPageID: page.id, extend: shift)
                 }
                 interaction = .move
+                store.beginGestureSnapshot()
                 moveStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
             } else {
                 interaction = .marquee

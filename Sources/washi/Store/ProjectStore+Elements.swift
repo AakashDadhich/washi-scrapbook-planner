@@ -31,7 +31,9 @@ extension ProjectStore {
             isLocked: false,
             content: content
         )
-        project.album.pages[idx].elements.append(element)
+        withUndoCheckpoint {
+            project.album.pages[idx].elements.append(element)
+        }
         selectedElementIDs = [element.id]
         activeTool = .select
         markDirty()

@@ -32,6 +32,7 @@ extension ProjectStore {
         guard let pageID = selectedPageID, let current = selectionCombinedCm() else { return }
         let delta = CGSize(width: newCenter.x - current.position.x, height: newCenter.y - current.position.y)
         let start = currentTransformSnapshot(forSelectionOnPageID: pageID)
+        beginGestureSnapshot()
         _ = applyMovePreview(onPageID: pageID, deltaCm: delta, startTransforms: start, suspendSnapping: true)
         endInteraction()
     }
@@ -44,7 +45,9 @@ extension ProjectStore {
 
         if selectedElementIDs.count == 1, let id = selectedElementIDs.first,
            let elIdx = elementIndex(id, onPageID: pageID), !project.album.pages[pIdx].elements[elIdx].isLocked {
-            project.album.pages[pIdx].elements[elIdx].transform.size = clamped
+            withUndoCheckpoint {
+                project.album.pages[pIdx].elements[elIdx].transform.size = clamped
+            }
             markDirty()
             return
         }
@@ -55,13 +58,15 @@ extension ProjectStore {
         let anchor = CGPoint(x: bounds.midX, y: bounds.midY)
         let start = currentTransformSnapshot(forSelectionOnPageID: pageID)
 
-        for i in project.album.pages[pIdx].elements.indices {
-            let id = project.album.pages[pIdx].elements[i].id
-            guard let s = start[id] else { continue }
-            let newPos = CGPoint(x: anchor.x + (s.position.x - anchor.x) * sx, y: anchor.y + (s.position.y - anchor.y) * sy)
-            let newSize = CGSize(width: max(s.size.width * sx, 0.05), height: max(s.size.height * sy, 0.05))
-            project.album.pages[pIdx].elements[i].transform.position = newPos
-            project.album.pages[pIdx].elements[i].transform.size = newSize
+        withUndoCheckpoint {
+            for i in project.album.pages[pIdx].elements.indices {
+                let id = project.album.pages[pIdx].elements[i].id
+                guard let s = start[id] else { continue }
+                let newPos = CGPoint(x: anchor.x + (s.position.x - anchor.x) * sx, y: anchor.y + (s.position.y - anchor.y) * sy)
+                let newSize = CGSize(width: max(s.size.width * sx, 0.05), height: max(s.size.height * sy, 0.05))
+                project.album.pages[pIdx].elements[i].transform.position = newPos
+                project.album.pages[pIdx].elements[i].transform.size = newSize
+            }
         }
         markDirty()
     }
@@ -71,7 +76,9 @@ extension ProjectStore {
         guard let pageID = selectedPageID, selectedElementIDs.count == 1, let id = selectedElementIDs.first,
               let elIdx = elementIndex(id, onPageID: pageID), let pIdx = pageIndex(for: pageID),
               !project.album.pages[pIdx].elements[elIdx].isLocked else { return }
-        project.album.pages[pIdx].elements[elIdx].transform.rotationDegrees = degrees
+        withUndoCheckpoint {
+            project.album.pages[pIdx].elements[elIdx].transform.rotationDegrees = degrees
+        }
         markDirty()
     }
 
@@ -85,7 +92,9 @@ extension ProjectStore {
 
     func setVisible(_ visible: Bool, forElementID id: UUID, onPageID pageID: UUID) {
         guard let idx = elementIndex(id, onPageID: pageID), let pIdx = pageIndex(for: pageID) else { return }
-        project.album.pages[pIdx].elements[idx].isVisible = visible
+        withUndoCheckpoint {
+            project.album.pages[pIdx].elements[idx].isVisible = visible
+        }
         if !visible {
             selectedElementIDs.remove(id)
         }
@@ -104,9 +113,11 @@ extension ProjectStore {
         ordered.insert(moved, at: clampedDest)
 
         let count = ordered.count
-        for (displayPos, element) in ordered.enumerated() {
-            guard let elIdx = project.album.pages[pIdx].elements.firstIndex(where: { $0.id == element.id }) else { continue }
-            project.album.pages[pIdx].elements[elIdx].zIndex = count - displayPos
+        withUndoCheckpoint {
+            for (displayPos, element) in ordered.enumerated() {
+                guard let elIdx = project.album.pages[pIdx].elements.firstIndex(where: { $0.id == element.id }) else { continue }
+                project.album.pages[pIdx].elements[elIdx].zIndex = count - displayPos
+            }
         }
         markDirty()
     }

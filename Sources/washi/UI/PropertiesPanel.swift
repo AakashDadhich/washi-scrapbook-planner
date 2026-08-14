@@ -6,6 +6,7 @@ import SwiftUI
 /// shown while the panel is open, regardless of selection count).
 struct PropertiesPanel: View {
     @EnvironmentObject var store: ProjectStore
+    @FocusState private var focusedField: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -77,6 +78,8 @@ struct PropertiesPanel: View {
             TextField("", value: Binding<Double>(get: { Double(value) }, set: { onCommit(CGFloat($0)) }), format: .number.precision(.fractionLength(0...2)))
                 .textFieldStyle(.roundedBorder)
                 .font(.caption)
+                .focused($focusedField, equals: label)
+                .onSubmit { focusedField = nil }
         }
     }
 

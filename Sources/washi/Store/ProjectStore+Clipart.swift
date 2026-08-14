@@ -24,7 +24,9 @@ extension ProjectStore {
     @discardableResult
     func importClipartToLibrary(from url: URL) throws -> AssetRecord {
         let record = try importAsset(from: url)
-        project.assetManifest[record.id]?.isClipartImport = true
+        withUndoCheckpoint {
+            project.assetManifest[record.id]?.isClipartImport = true
+        }
         markDirty()
         return project.assetManifest[record.id] ?? record
     }

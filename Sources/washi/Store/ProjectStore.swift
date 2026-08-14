@@ -45,6 +45,12 @@ final class ProjectStore: ObservableObject {
     @Published var pendingFrameBorder: BorderStyle = .defaultStyle
     @Published var pendingFrameFill: ColorValue?
 
+    let undoStack = UndoStack()
+    /// The state captured at the *start* of an in-progress drag/resize/
+    /// rotate, so every preview frame in between collapses into one undo
+    /// step on gesture end rather than one step per frame (spec §8).
+    private var gestureBaseline: Project?
+
     private(set) var packageURL: URL
     private(set) var lastSavedURL: URL?
 
@@ -72,17 +78,82 @@ final class ProjectStore: ObservableObject {
     // MARK: - Mutation entry point
 
     /// Every direct mutation of `project` outside `ProjectStore` should be
-    /// followed by a call to this (or go through `UndoStack`, from M13 on).
+    /// followed by a call to this.
     func markDirty() {
         hasUnsavedChanges = true
         project.modifiedAt = Date()
+    }
+
+    // MARK: - Undo/redo (spec §8)
+
+    /// Every mutating `ProjectStore` method should wrap its mutation of
+    /// `project` in this (or, for a continuous gesture, bracket it with
+    /// `beginGestureSnapshot()`/`commitGestureCheckpoint()` instead) so
+    /// every change is captured on `undoStack` as one step.
+    @discardableResult
+    func withUndoCheckpoint<T>(_ body: () -> T) -> T {
+        let before = project
+        let result = body()
+        if project != before {
+            undoStack.pushUndo(before)
+        }
+        return result
+    }
+
+    /// Call once, right as a drag/resize/rotate gesture begins (before any
+    /// preview mutation) — pairs with `commitGestureCheckpoint()`.
+    func beginGestureSnapshot() {
+        gestureBaseline = project
+    }
+
+    /// Call once the gesture ends: pushes the pre-gesture snapshot as a
+    /// single undo step covering the whole drag, not one per preview frame.
+    func commitGestureCheckpoint() {
+        guard let before = gestureBaseline else { return }
+        gestureBaseline = nil
+        if project != before {
+            undoStack.pushUndo(before)
+        }
+    }
+
+    func undo() {
+        guard let previous = undoStack.undo(current: project) else { return }
+        project = previous
+        reconcileSelectionAfterHistoryChange()
+        hasUnsavedChanges = true
+    }
+
+    func redo() {
+        guard let next = undoStack.redo(current: project) else { return }
+        project = next
+        reconcileSelectionAfterHistoryChange()
+        hasUnsavedChanges = true
+    }
+
+    /// After an undo/redo swaps `project` wholesale, transient selection
+    /// state may point at pages/elements that no longer exist in the
+    /// restored snapshot (e.g. undoing a page-add, or an element delete).
+    private func reconcileSelectionAfterHistoryChange() {
+        if let pid = selectedPageID, project.album.pages.contains(where: { $0.id == pid }) {
+            let validIDs = Set(page(for: pid)?.elements.map(\.id) ?? [])
+            selectedElementIDs.formIntersection(validIDs)
+        } else {
+            selectedPageID = project.album.pages.first?.id
+            selectedElementIDs.removeAll()
+        }
+        filmstripMultiSelection.removeAll()
+        activeAlignmentGuides = .none
     }
 
     // MARK: - Asset import
 
     @discardableResult
     func importAsset(from sourceURL: URL) throws -> AssetRecord {
+        let before = project
         let record = try ProjectFile.importAsset(from: sourceURL, into: &project, packageURL: packageURL)
+        if project != before {
+            undoStack.pushUndo(before)
+        }
         markDirty()
         return record
     }
