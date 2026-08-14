@@ -80,7 +80,7 @@ struct PageFilmstripView: View {
                 store.selectUnit(at: index)
             }
         } label: {
-            PageUnitView(unit: unit)
+            PageUnitView(unit: unit, isInteractive: false)
                 .frame(width: unit.isSpread ? 96 : 48, height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .overlay(
@@ -138,8 +138,10 @@ struct PageFilmstripView: View {
         switch unit {
         case .single:
             return "This removes 1 page and everything on it. This cannot be undone after closing the project."
-        case .spread:
-            return "This removes 2 pages and everything on them. This cannot be undone after closing the project."
+        case .spread(let left, let right):
+            let leftName = left.pageNumber.map { "Page \($0)" } ?? "the left page"
+            let rightName = right.pageNumber.map { "Page \($0)" } ?? "the right page"
+            return "This removes \(leftName) and \(rightName), and everything on them. This cannot be undone after closing the project."
         }
     }
 }

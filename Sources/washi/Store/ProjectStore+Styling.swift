@@ -65,4 +65,15 @@ extension ProjectStore {
         }
         markDirty()
     }
+
+    /// Changes only this page's size — never touches its elements' transforms,
+    /// so a smaller size may leave elements extending past the new bounds
+    /// (spec §14 edge case 11: no auto-scaling, no auto-fit).
+    func setCurrentPageSize(_ size: PageSize) {
+        guard let pageID = selectedPageID, let idx = pageIndex(for: pageID) else { return }
+        withUndoCheckpoint {
+            project.album.pages[idx].size = size
+        }
+        markDirty()
+    }
 }

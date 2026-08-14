@@ -4,6 +4,8 @@ import SwiftUI
 /// the wireframe's bottom-bar color-picker segment (spec §5.5).
 struct BackgroundToolControls: View {
     @Binding var background: PageBackground
+    var pageSize: PageSize?
+    var onPageSizeChange: ((PageSize) -> Void)?
 
     private var currentColor: ColorValue {
         if case .solidColor(let c) = background { return c }
@@ -22,6 +24,29 @@ struct BackgroundToolControls: View {
                 get: { currentColor },
                 set: { background = .solidColor($0) }
             ))
+
+            if let pageSize, let onPageSizeChange {
+                Divider().frame(height: 32)
+
+                Picker("Page size", selection: Binding(
+                    get: { pageSize.name },
+                    set: { name in
+                        if let preset = PageSize.presets.first(where: { $0.name == name }) {
+                            onPageSizeChange(preset)
+                        }
+                    }
+                )) {
+                    ForEach(PageSize.presets, id: \.name) { preset in
+                        Text(preset.name).tag(preset.name)
+                    }
+                    if !PageSize.presets.contains(where: { $0.name == pageSize.name }) {
+                        Text(pageSize.name).tag(pageSize.name)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 200)
+                .help("Changing page size does not resize existing elements — they may extend past the new bounds.")
+            }
         }
         .padding(.horizontal, 16)
     }

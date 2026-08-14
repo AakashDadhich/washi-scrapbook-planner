@@ -18,6 +18,10 @@ import AppKit
 struct PageCanvasView: View {
     @EnvironmentObject var store: ProjectStore
     var page: Page
+    /// `false` when rendered as a passive filmstrip thumbnail rather than
+    /// the live canvas — suppresses selection handles, the marquee/place/
+    /// transform gesture, and element context menus.
+    var isInteractive: Bool = true
 
     private enum Interaction: Equatable {
         case idle
@@ -52,29 +56,33 @@ struct PageCanvasView: View {
                 ForEach(page.elements.filter(\.isVisible).sorted(by: { $0.zIndex < $1.zIndex })) { element in
                     PlacedElementView(element: element, pageID: page.id, pageSizePt: geo.size, pageSizeCm: pageSizeCm)
                         .contextMenu {
-                            elementContextMenu(for: element)
+                            if isInteractive {
+                                elementContextMenu(for: element)
+                            }
                         }
                 }
 
-                alignmentGuideLines(scale: scale, pageSizePt: geo.size)
+                if isInteractive {
+                    alignmentGuideLines(scale: scale, pageSizePt: geo.size)
 
-                if let bounds = selectionBoundsPt(scale: scale) {
-                    SelectionHandlesView(
-                        centerPt: CGPoint(x: bounds.midX, y: bounds.midY),
-                        sizePt: bounds.size,
-                        rotationDegrees: selectionRotationDegrees,
-                        isLocked: selectionIsLocked
-                    )
-                }
+                    if let bounds = selectionBoundsPt(scale: scale) {
+                        SelectionHandlesView(
+                            centerPt: CGPoint(x: bounds.midX, y: bounds.midY),
+                            sizePt: bounds.size,
+                            rotationDegrees: selectionRotationDegrees,
+                            isLocked: selectionIsLocked
+                        )
+                    }
 
-                if let start = marqueeStart, let current = marqueeCurrent {
-                    marqueeRect(start: start, current: current)
+                    if let start = marqueeStart, let current = marqueeCurrent {
+                        marqueeRect(start: start, current: current)
+                    }
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .coordinateSpace(name: "page")
             .contentShape(Rectangle())
-            .gesture(canvasGesture(scale: scale))
+            .gesture(canvasGesture(scale: scale), including: isInteractive ? .all : .none)
         }
         .aspectRatio(page.size.widthCm / page.size.heightCm, contentMode: .fit)
     }

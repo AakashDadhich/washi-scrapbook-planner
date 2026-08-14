@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Right-side panel (spec §5.6), visible only when ≥1 canvas element is
 /// selected. Two sections: numeric Transform fields for the current
@@ -79,7 +80,14 @@ struct PropertiesPanel: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.caption)
                 .focused($focusedField, equals: label)
-                .onSubmit { focusedField = nil }
+                .onSubmit {
+                    focusedField = nil
+                    // The field editor otherwise keeps first-responder status
+                    // after Return, silently swallowing the next Cmd+Z into
+                    // its own (empty) per-field undo manager instead of
+                    // letting it reach the app-level undo shortcut (spec §8).
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                }
         }
     }
 

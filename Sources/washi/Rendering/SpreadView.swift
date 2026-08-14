@@ -4,11 +4,12 @@ import SwiftUI
 struct SpreadView: View {
     var left: Page
     var right: Page
+    var isInteractive: Bool = true
 
     var body: some View {
         HStack(spacing: 2) {
-            PageCanvasView(page: left)
-            PageCanvasView(page: right)
+            PageCanvasView(page: left, isInteractive: isInteractive)
+            PageCanvasView(page: right, isInteractive: isInteractive)
         }
     }
 }

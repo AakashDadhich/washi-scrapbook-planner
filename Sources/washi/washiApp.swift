@@ -47,10 +47,31 @@ final class AppRootState: ObservableObject {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            store = try ProjectStore.open(packageURL: url)
+            let opened = try ProjectStore.open(packageURL: url)
+            if ProjectStore.pendingAutosaveRecovery(packageURL: url) != nil {
+                if presentAutosaveRecoveryPrompt(projectName: url.deletingPathExtension().lastPathComponent) {
+                    opened.recoverFromAutosave()
+                } else {
+                    opened.discardPendingAutosave()
+                }
+            }
+            store = opened
         } catch {
             openErrorMessage = "Couldn't open \(url.lastPathComponent): \(error.localizedDescription)"
         }
+    }
+
+    /// Offered on open whenever an autosave snapshot postdates the last save
+    /// (spec §14 edge case 13): returns `true` to recover it, `false` to
+    /// discard it — declining discards the snapshot outright rather than
+    /// leaving it to reappear on a later open.
+    private func presentAutosaveRecoveryPrompt(projectName: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Recover unsaved changes?"
+        alert.informativeText = "Washi found changes to \"\(projectName)\" that weren't saved before it was last closed."
+        alert.addButton(withTitle: "Recover")
+        alert.addButton(withTitle: "Discard")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 }
 

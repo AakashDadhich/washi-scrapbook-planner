@@ -44,10 +44,14 @@ struct ToolControlBar: View {
     @ViewBuilder
     private var backgroundContent: some View {
         if let pageID = store.selectedPageID, let idx = store.pageIndex(for: pageID) {
-            BackgroundToolControls(background: Binding(
-                get: { store.project.album.pages[idx].background },
-                set: { store.setCurrentPageBackground($0) }
-            ))
+            BackgroundToolControls(
+                background: Binding(
+                    get: { store.project.album.pages[idx].background },
+                    set: { store.setCurrentPageBackground($0) }
+                ),
+                pageSize: store.project.album.pages[idx].size,
+                onPageSizeChange: { store.setCurrentPageSize($0) }
+            )
         } else {
             BackgroundToolControls(background: .constant(.solidColor(.white)))
         }
