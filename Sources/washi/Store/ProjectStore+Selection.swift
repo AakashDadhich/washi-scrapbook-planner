@@ -214,6 +214,58 @@ extension ProjectStore {
         }
     }
 
+    // MARK: - Select all (spec §12, Cmd+A)
+
+    /// Selects every visible element on `pageID` — the current page, or
+    /// whichever half of a spread is currently `selectedPageID` (the rest
+    /// of the store's selection model is single-page-scoped, so a cross-
+    /// page "select all" for a whole spread would break every downstream
+    /// transform/group operation that indexes by one `pageID`).
+    func selectAllElements(onPageID pageID: UUID) {
+        guard let page = page(for: pageID) else { return }
+        selectedPageID = pageID
+        selectedElementIDs = Set(page.elements.filter(\.isVisible).map(\.id))
+    }
+
+    // MARK: - Duplicate (spec §12, Cmd+D)
+
+    /// Duplicates every selected element, offset slightly so the copies
+    /// are visibly distinct, placed above the originals in z-order and
+    /// selected in their place. Any persisted group whose full membership
+    /// is included in the selection is duplicated too, so a grouped
+    /// duplicate stays grouped.
+    func duplicateSelection(onPageID pageID: UUID) {
+        guard let idx = pageIndex(for: pageID) else { return }
+        let originals = project.album.pages[idx].elements.filter { selectedElementIDs.contains($0.id) }
+        guard !originals.isEmpty else { return }
+
+        let offset: CGFloat = 1
+        let maxZ = project.album.pages[idx].elements.map(\.zIndex).max() ?? -1
+        var idMap: [UUID: UUID] = [:]
+        var copies: [PageElement] = []
+        for (offsetIndex, original) in originals.enumerated() {
+            var copy = original
+            copy.id = UUID()
+            copy.transform.position.x += offset
+            copy.transform.position.y += offset
+            copy.zIndex = maxZ + 1 + offsetIndex
+            idMap[original.id] = copy.id
+            copies.append(copy)
+        }
+
+        withUndoCheckpoint {
+            project.album.pages[idx].elements.append(contentsOf: copies)
+            for group in project.album.pages[idx].groups {
+                let mappedIDs = group.elementIDs.compactMap { idMap[$0] }
+                if mappedIDs.count == group.elementIDs.count, mappedIDs.count >= 2 {
+                    project.album.pages[idx].groups.append(ElementGroup(id: UUID(), name: group.name, elementIDs: mappedIDs))
+                }
+            }
+        }
+        selectedElementIDs = Set(copies.map(\.id))
+        markDirty()
+    }
+
     // MARK: - Delete (respects lock, spec §6.4)
 
     func deleteSelectedElements(onPageID pageID: UUID) {

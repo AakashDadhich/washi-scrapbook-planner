@@ -34,6 +34,24 @@ struct WashiApp: App {
 final class AppRootState: ObservableObject {
     @Published var store: ProjectStore?
     @Published var showNewProjectSheet = false
+    @Published var showKeyboardShortcuts = false
+    @Published var openErrorMessage: String?
+
+    /// `File > Open...` / `Cmd+O` (spec §10.2, §12): picks a `.washi`
+    /// package and reconstructs its `Project` from `manifest.json`.
+    func presentOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType("com.washi.project")].compactMap { $0 }
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            store = try ProjectStore.open(packageURL: url)
+        } catch {
+            openErrorMessage = "Couldn't open \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
 }
 
 /// The window's fixed chrome (spec §5): title bar, floating tool rail over
@@ -46,25 +64,53 @@ struct WashiWindowView: View {
     var body: some View {
         Group {
             if let store = root.store {
-                EditorView(store: store, onNew: { root.showNewProjectSheet = true })
+                EditorView(store: store, onNew: { root.showNewProjectSheet = true }, onInfo: { root.showKeyboardShortcuts = true })
                     .environmentObject(store)
             } else {
                 emptyStateBody
             }
         }
         .frame(minWidth: 1000, minHeight: 700)
+        .overlay(globalShortcuts)
         .sheet(isPresented: $root.showNewProjectSheet) {
             NewProjectSheet { project in
                 root.store = ProjectStore(project: project)
             }
         }
+        .sheet(isPresented: $root.showKeyboardShortcuts) {
+            KeyboardShortcutsSheet()
+        }
+        .alert("Couldn't Open Project", isPresented: Binding(
+            get: { root.openErrorMessage != nil },
+            set: { if !$0 { root.openErrorMessage = nil } }
+        )) {
+            Button("OK") { root.openErrorMessage = nil }
+        } message: {
+            Text(root.openErrorMessage ?? "")
+        }
+    }
+
+    /// `Cmd+N`/`Cmd+O`/`Cmd+/` (spec §12) work whether or not a project is
+    /// currently open, so they live above the New-Project/Editor split
+    /// rather than inside either branch.
+    private var globalShortcuts: some View {
+        ZStack {
+            Button("") { root.showNewProjectSheet = true }
+                .keyboardShortcut("n", modifiers: [.command])
+            Button("") { root.presentOpenPanel() }
+                .keyboardShortcut("o", modifiers: [.command])
+            Button("") { root.showKeyboardShortcuts = true }
+                .keyboardShortcut("/", modifiers: [.command])
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
     }
 
     private var emptyStateBody: some View {
         VStack(spacing: 0) {
             TitleBarControls(
                 onNew: { root.showNewProjectSheet = true },
-                onInfo: {},
+                onInfo: { root.showKeyboardShortcuts = true },
                 onSave: {},
                 onExport: {},
                 hasUnsavedChanges: false,
@@ -77,7 +123,10 @@ struct WashiWindowView: View {
                     .foregroundStyle(.secondary)
                 Text("No project open")
                     .font(.title3)
-                Button("New Project...") { root.showNewProjectSheet = true }
+                HStack(spacing: 12) {
+                    Button("New Project...") { root.showNewProjectSheet = true }
+                    Button("Open Project...") { root.presentOpenPanel() }
+                }
             }
             Spacer()
         }
@@ -89,15 +138,17 @@ struct WashiWindowView: View {
 private struct EditorView: View {
     @ObservedObject var store: ProjectStore
     var onNew: () -> Void
+    var onInfo: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showExportSheet = false
+    @State private var saveErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
             TitleBarControls(
                 onNew: onNew,
-                onInfo: {},
-                onSave: {},
+                onInfo: onInfo,
+                onSave: performSave,
                 onExport: { showExportSheet = true },
                 hasUnsavedChanges: store.hasUnsavedChanges,
                 canSaveOrExport: true
@@ -142,12 +193,48 @@ private struct EditorView: View {
         .sheet(isPresented: $showExportSheet) {
             ExportSheet()
         }
+        .alert("Couldn't Save Project", isPresented: Binding(
+            get: { saveErrorMessage != nil },
+            set: { if !$0 { saveErrorMessage = nil } }
+        )) {
+            Button("OK") { saveErrorMessage = nil }
+        } message: {
+            Text(saveErrorMessage ?? "")
+        }
     }
 
-    /// Hidden buttons carrying the selection-scoped keyboard shortcuts
-    /// (spec §12): Delete, Cmd+G, Cmd+Shift+G. Not visible chrome — just a
-    /// reliable place to attach `.keyboardShortcut` independent of which
-    /// on-canvas view happens to have focus.
+    // MARK: - Save / Save As (spec §10.2, §12)
+
+    private func performSave() {
+        if store.lastSavedURL != nil {
+            do {
+                try store.save()
+            } catch {
+                saveErrorMessage = error.localizedDescription
+            }
+        } else {
+            presentSaveAsPanel()
+        }
+    }
+
+    private func presentSaveAsPanel() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType("com.washi.project")].compactMap { $0 }
+        panel.nameFieldStringValue = store.project.name
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try store.saveAs(to: url)
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Hidden buttons carrying every project-scoped keyboard shortcut in
+    /// spec §12 that isn't already wired elsewhere (Delete, Cmd+G,
+    /// Cmd+Shift+G, undo/redo, save, duplicate, select all, import,
+    /// export). Not visible chrome — just a reliable place to attach
+    /// `.keyboardShortcut` independent of which on-canvas view happens to
+    /// have focus.
     private var selectionShortcuts: some View {
         ZStack {
             Button("") { store.undo() }
@@ -179,6 +266,32 @@ private struct EditorView: View {
                 }
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
+
+            Button("") { performSave() }
+                .keyboardShortcut("s", modifiers: [.command])
+
+            Button("") { presentSaveAsPanel() }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+
+            Button("") {
+                if let pageID = store.selectedPageID {
+                    store.duplicateSelection(onPageID: pageID)
+                }
+            }
+            .keyboardShortcut("d", modifiers: [.command])
+
+            Button("") {
+                if let pageID = store.selectedPageID {
+                    store.selectAllElements(onPageID: pageID)
+                }
+            }
+            .keyboardShortcut("a", modifiers: [.command])
+
+            Button("") { presentImagePicker() }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+
+            Button("") { showExportSheet = true }
+                .keyboardShortcut("e", modifiers: [.command])
         }
         .frame(width: 0, height: 0)
         .opacity(0)
