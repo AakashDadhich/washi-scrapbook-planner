@@ -49,7 +49,7 @@ struct PageCanvasView: View {
             ZStack {
                 backgroundView
 
-                ForEach(page.elements.sorted(by: { $0.zIndex < $1.zIndex })) { element in
+                ForEach(page.elements.filter(\.isVisible).sorted(by: { $0.zIndex < $1.zIndex })) { element in
                     PlacedElementView(element: element, pageID: page.id, pageSizePt: geo.size, pageSizeCm: pageSizeCm)
                         .contextMenu {
                             elementContextMenu(for: element)
@@ -223,7 +223,7 @@ struct PageCanvasView: View {
     // MARK: - Hit-testing
 
     private func hitTestElement(cmPoint: CGPoint) -> PageElement? {
-        for element in page.elements.sorted(by: { $0.zIndex > $1.zIndex }) {
+        for element in page.elements.filter(\.isVisible).sorted(by: { $0.zIndex > $1.zIndex }) {
             let rel = CGSize(width: cmPoint.x - element.transform.position.x, height: cmPoint.y - element.transform.position.y)
             let local = TransformMath.rotate(rel, byDegrees: -element.transform.rotationDegrees)
             if abs(local.width) <= element.transform.size.width / 2, abs(local.height) <= element.transform.size.height / 2 {

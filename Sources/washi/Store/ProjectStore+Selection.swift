@@ -54,7 +54,7 @@ extension ProjectStore {
 
     func selectElements(intersecting rectCm: CGRect, onPageID pageID: UUID) {
         guard let page = page(for: pageID) else { return }
-        let hits = page.elements.filter { rectCm.intersects($0.transform.unrotatedRect) }
+        let hits = page.elements.filter { $0.isVisible && rectCm.intersects($0.transform.unrotatedRect) }
         selectedPageID = pageID
         selectedElementIDs = Set(hits.map(\.id))
     }

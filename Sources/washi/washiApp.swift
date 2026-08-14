@@ -92,28 +92,34 @@ private struct EditorView: View {
                 canSaveOrExport: true
             )
 
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 0) {
-                    canvasArea
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    VStack(spacing: 0) {
+                        canvasArea
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    PageFilmstripView(
-                        onPrev: { store.goToPreviousUnit() },
-                        onNext: { store.goToNextUnit() }
+                        PageFilmstripView(
+                            onPrev: { store.goToPreviousUnit() },
+                            onNext: { store.goToNextUnit() }
+                        )
+
+                        ToolControlBar()
+                    }
+
+                    ToolRail(
+                        activeTool: $store.activeTool,
+                        onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
+                        onAddSpread: { store.addSpread(after: store.selectedPageID) }
                     )
-
-                    ToolControlBar()
+                    .padding(.leading, 16)
+                    .padding(.top, 16)
                 }
+                .overlay(selectionShortcuts)
 
-                ToolRail(
-                    activeTool: $store.activeTool,
-                    onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
-                    onAddSpread: { store.addSpread(after: store.selectedPageID) }
-                )
-                .padding(.leading, 16)
-                .padding(.top, 16)
+                if !store.selectedElementIDs.isEmpty {
+                    PropertiesPanel()
+                }
             }
-            .overlay(selectionShortcuts)
         }
         .environmentObject(store)
         .background(Color(nsColor: .windowBackgroundColor))
