@@ -50,19 +50,23 @@ struct BorderStylePicker: View {
 
     private func shapeThumbnail(_ shape: BorderShape) -> some View {
         let isSelected = shapeCaseMatches(border.shape, shape)
-        return Button {
-            border.shape = shapeReplacingParameters(shape, from: border.shape)
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 4).fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-                BorderThumbnailShape(shape: shape)
-                    .stroke(Color.primary, lineWidth: 1.2)
-                    .padding(4)
-            }
-            .frame(width: 30, height: 24)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: isSelected ? 2 : 1))
+        return ZStack {
+            RoundedRectangle(cornerRadius: 4).fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+            BorderThumbnailShape(shape: shape)
+                .stroke(Color.primary, lineWidth: 1.2)
+                .padding(4)
         }
-        .buttonStyle(.plain)
+        .frame(width: 30, height: 24)
+        .contentShape(Rectangle())
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: isSelected ? 2 : 1))
+        // `Button` inside this row's enclosing `ScrollView(.horizontal)` (ToolControlBar)
+        // stops delivering clicks to sibling swatches on macOS after the first tap on any
+        // one of them — the same class of AppKit hit-testing unreliability noted for the
+        // canvas's own gesture handling. `onTapGesture` uses SwiftUI's gesture recognizer
+        // instead of AppKit button tracking and doesn't have this failure mode.
+        .onTapGesture {
+            border.shape = shapeReplacingParameters(shape, from: border.shape)
+        }
         .help(shapeName(shape))
     }
 
