@@ -19,6 +19,7 @@ BIN_PATH="$(swift build -c release --show-bin-path)/washi"
 cp "$BIN_PATH" "$MACOS_DIR/washi"
 
 cp Resources/Info.plist "$CONTENTS/Info.plist"
+cp Resources/AppIcon.icns "$RESOURCES_DIR/AppIcon.icns"
 
 if [ -d "Resources/Assets/StarterClipart" ]; then
     mkdir -p "$RESOURCES_DIR/StarterClipart"

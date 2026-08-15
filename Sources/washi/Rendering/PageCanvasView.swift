@@ -51,38 +51,67 @@ struct PageCanvasView: View {
             let scale = geo.size.width > 0 ? geo.size.width / CGFloat(page.size.widthCm) : 1
 
             ZStack {
-                backgroundView
+                // Everything whose interaction is driven by the unified
+                // canvas gesture. That gesture is entirely disabled while
+                // text-editing (see below), so its own `.gesture(...,
+                // including: .none)` also silences any nested gesture in
+                // this subtree — the click-outside-to-commit catcher and
+                // the live text editor below are therefore kept as
+                // siblings *outside* this masked subtree, not nested
+                // inside it.
+                ZStack {
+                    backgroundView
 
-                ForEach(page.elements.filter(\.isVisible).sorted(by: { $0.zIndex < $1.zIndex })) { element in
-                    PlacedElementView(element: element, pageID: page.id, pageSizePt: geo.size, pageSizeCm: pageSizeCm)
-                        .contextMenu {
-                            if isInteractive {
-                                elementContextMenu(for: element)
-                            }
+                    ForEach(page.elements.filter(\.isVisible).sorted(by: { $0.zIndex < $1.zIndex })) { element in
+                        if !(isInteractive && store.editingTextElementID == element.id) {
+                            PlacedElementView(element: element, pageID: page.id, pageSizePt: geo.size, pageSizeCm: pageSizeCm)
+                                .contextMenu {
+                                    if isInteractive {
+                                        elementContextMenu(for: element)
+                                    }
+                                }
                         }
+                    }
+
+                    if isInteractive {
+                        alignmentGuideLines(scale: scale, pageSizePt: geo.size)
+
+                        if store.editingTextElementID == nil, let bounds = selectionBoundsPt(scale: scale) {
+                            SelectionHandlesView(
+                                centerPt: CGPoint(x: bounds.midX, y: bounds.midY),
+                                sizePt: bounds.size,
+                                rotationDegrees: selectionRotationDegrees,
+                                isLocked: selectionIsLocked
+                            )
+                        }
+
+                        if let start = marqueeStart, let current = marqueeCurrent {
+                            marqueeRect(start: start, current: current)
+                        }
+                    }
+                }
+                .contentShape(Rectangle())
+                .gesture(canvasGesture(scale: scale), including: (isInteractive && store.editingTextElementID == nil) ? .all : .none)
+
+                if isInteractive, store.editingTextElementID != nil {
+                    // Sits below the live text editor overlay: a click that
+                    // lands on the editing text box itself is hit-tested
+                    // there first (it's rendered after this, i.e. on top),
+                    // anything else falls through here and exits edit mode.
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { store.commitTextEditing() }
                 }
 
-                if isInteractive {
-                    alignmentGuideLines(scale: scale, pageSizePt: geo.size)
-
-                    if let bounds = selectionBoundsPt(scale: scale) {
-                        SelectionHandlesView(
-                            centerPt: CGPoint(x: bounds.midX, y: bounds.midY),
-                            sizePt: bounds.size,
-                            rotationDegrees: selectionRotationDegrees,
-                            isLocked: selectionIsLocked
-                        )
-                    }
-
-                    if let start = marqueeStart, let current = marqueeCurrent {
-                        marqueeRect(start: start, current: current)
-                    }
+                if isInteractive, let editingID = store.editingTextElementID,
+                   let editingElement = page.elements.first(where: { $0.id == editingID }),
+                   case .text(let text) = editingElement.content {
+                    PlacedTextEditorView(element: editingElement, text: text, pageID: page.id, pageSizePt: geo.size, pageSizeCm: pageSizeCm)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .coordinateSpace(name: "page")
-            .contentShape(Rectangle())
-            .gesture(canvasGesture(scale: scale), including: isInteractive ? .all : .none)
         }
         .aspectRatio(page.size.widthCm / page.size.heightCm, contentMode: .fit)
     }
@@ -150,6 +179,11 @@ struct PageCanvasView: View {
                 let isDoubleClick = hit.id == lastClickedElementID && now.timeIntervalSince(lastClickTime) < 0.4
                 lastClickTime = now
                 lastClickedElementID = hit.id
+
+                if isDoubleClick, case .text = hit.content, !hit.isLocked {
+                    store.beginTextEditing(hit.id, onPageID: page.id)
+                    return
+                }
 
                 if isDoubleClick {
                     store.selectSingleElementForEditing(hit.id, onPageID: page.id)

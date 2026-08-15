@@ -316,6 +316,13 @@ private struct EditorView: View {
         }
         .frame(width: 0, height: 0)
         .opacity(0)
+        // A disabled button's keyboard shortcut isn't intercepted at all
+        // (SwiftUI lets the key event fall through to the next responder),
+        // so while a text element is being edited in-place, Delete/Cmd+D/
+        // Cmd+A/etc. reach the canvas's NSTextView as ordinary typing
+        // instead of deleting/duplicating/selecting the element being
+        // edited out from under the user.
+        .disabled(store.editingTextElementID != nil)
     }
 
     // MARK: - Add Image (spec §5.2: file picker, or drag-and-drop onto the canvas)

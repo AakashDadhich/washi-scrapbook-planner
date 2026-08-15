@@ -31,6 +31,10 @@ final class ProjectStore: ObservableObject {
     @Published var lastNavigationKind: NavigationKind = .crossfade
     @Published var selectedElementIDs: Set<UUID> = []
     @Published var activeAlignmentGuides: AlignmentGuides = .none
+    /// The text element currently being edited in-place on the canvas
+    /// (double-click to enter, spec §14 edge case handled by
+    /// `ProjectStore+TextEditing`), or nil when nothing is being edited.
+    @Published var editingTextElementID: UUID?
 
     // Pending style templates for the next placed element (spec §5.2/D12).
     @Published var pendingTextStyle: TextElement = .makeDefault()
