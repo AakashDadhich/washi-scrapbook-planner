@@ -60,6 +60,7 @@ struct BorderStylePicker: View {
                     .padding(4)
             }
             .frame(width: 30, height: 24)
+            .contentShape(Rectangle())
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: isSelected ? 2 : 1))
         }
         .buttonStyle(.plain)
