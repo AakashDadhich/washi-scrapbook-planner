@@ -52,11 +52,11 @@ struct BorderStylePicker: View {
         let isSelected = shapeCaseMatches(border.shape, shape)
         return ZStack {
             RoundedRectangle(cornerRadius: 4).fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-            BorderThumbnailShape(shape: shape)
-                .stroke(Color.primary, lineWidth: 1.2)
+            thumbnailStroke(shape)
                 .padding(4)
         }
         .frame(width: 30, height: 24)
+        .clipped()
         .contentShape(Rectangle())
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: isSelected ? 2 : 1))
         // `Button` inside this row's enclosing `ScrollView(.horizontal)` (ToolControlBar)
@@ -68,6 +68,28 @@ struct BorderStylePicker: View {
             border.shape = shapeReplacingParameters(shape, from: border.shape)
         }
         .help(shapeName(shape))
+    }
+
+    /// Mirrors `BorderOverlay`'s per-shape stroking (`ElementView.swift`) so
+    /// the dashed/double-line icons actually look dashed/doubled instead of
+    /// collapsing into the same plain outline as `.straight` — `strokePath`
+    /// intentionally returns the same base rect path for all three, since
+    /// dash/double-line are meant to be applied by the caller via
+    /// `StrokeStyle`/double-stroke, not baked into the path geometry.
+    @ViewBuilder
+    private func thumbnailStroke(_ shape: BorderShape) -> some View {
+        switch shape {
+        case .dashed:
+            BorderThumbnailShape(shape: shape)
+                .stroke(Color.primary, style: StrokeStyle(lineWidth: 1.2, dash: [3, 2]))
+        case .doubleLine:
+            ZStack {
+                BorderThumbnailShape(shape: shape).stroke(Color.primary, lineWidth: 1.2)
+                BorderThumbnailShape(shape: shape).stroke(Color.primary, lineWidth: 1.2).padding(3)
+            }
+        default:
+            BorderThumbnailShape(shape: shape).stroke(Color.primary, lineWidth: 1.2)
+        }
     }
 
     private func shapeName(_ shape: BorderShape) -> String {
