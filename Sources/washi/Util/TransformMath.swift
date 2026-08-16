@@ -74,10 +74,8 @@ enum TransformMath {
         if handle.handleUnit.x != 0 { newW = max(abs(diagLocal.width), minSize) }
         if handle.handleUnit.y != 0 { newH = max(abs(diagLocal.height), minSize) }
 
-        if proportional, original.size.width > 0, original.size.height > 0 {
-            let scale: CGFloat = handle.isCorner
-                ? (newW / original.size.width + newH / original.size.height) / 2
-                : max(newW / original.size.width, newH / original.size.height)
+        if proportional, handle.isCorner, original.size.width > 0, original.size.height > 0 {
+            let scale = (newW / original.size.width + newH / original.size.height) / 2
             newW = original.size.width * scale
             newH = original.size.height * scale
         }
