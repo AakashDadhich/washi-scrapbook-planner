@@ -42,11 +42,29 @@ extension ProjectStore {
 
     /// Places using `pendingTextStyle` as the template — pre-set by the
     /// tool control bar the moment Add Text is activated, before anything
-    /// is placed (spec §5.2/D12).
-    func placeDefaultText(onPageID pageID: UUID, atCm point: CGPoint) {
+    /// is placed (spec §5.2/D12) — and drops straight into the same
+    /// in-place edit mode double-click uses, with the placeholder
+    /// pre-selected (issue #7). Snapshots for undo *before* appending the
+    /// element (rather than going through `addElement`'s own
+    /// `withUndoCheckpoint`) so the whole placement-plus-typing session
+    /// collapses into a single undo step when `commitTextEditing()` runs.
+    func placeDefaultTextAndBeginEditing(onPageID pageID: UUID, atCm point: CGPoint) {
+        guard let idx = pageIndex(for: pageID) else { return }
+        beginGestureSnapshot()
         var text = pendingTextStyle
         text.string = "Text"
-        addElement(.text(text), center: point, size: CGSize(width: 8, height: 3), toPageID: pageID)
+        let element = PageElement(
+            id: UUID(),
+            transform: Transform2D(position: point, size: CGSize(width: 8, height: 3), rotationDegrees: 0),
+            zIndex: nextZIndex(onPageID: pageID),
+            isLocked: false,
+            content: .text(text)
+        )
+        project.album.pages[idx].elements.append(element)
+        selectSingleElementForEditing(element.id, onPageID: pageID)
+        activeTool = .select
+        markDirty()
+        editingTextElementID = element.id
     }
 
     func placeDefaultFrame(onPageID pageID: UUID, atCm point: CGPoint) {
