@@ -9,20 +9,24 @@ struct StickerToolControls: View {
     var isEnabled: Bool
 
     var body: some View {
-        HStack(spacing: 16) {
-            Toggle("Tint", isOn: Binding(
-                get: { tint != nil },
-                set: { tint = $0 ? (tint ?? ColorValue(hex: "#E38FB0")) : nil }
-            ))
-            .toggleStyle(.checkbox)
+        HStack(spacing: 14) {
+            ControlGroupBox(label: "Tint") {
+                IconToggleButton(
+                    icon: "drop.fill",
+                    label: "Tint",
+                    isOn: Binding(
+                        get: { tint != nil },
+                        set: { tint = $0 ? (tint ?? ColorValue(hex: "#E38FB0")) : nil }
+                    )
+                )
 
-            ColorSwatchWithHex(color: Binding(
-                get: { tint ?? ColorValue(hex: "#E38FB0") },
-                set: { tint = $0 }
-            ))
+                ColorSwatchWithHex(color: Binding(
+                    get: { tint ?? ColorValue(hex: "#E38FB0") },
+                    set: { tint = $0 }
+                ))
+            }
         }
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
-        .padding(.horizontal, 16)
     }
 }

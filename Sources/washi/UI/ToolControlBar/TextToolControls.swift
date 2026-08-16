@@ -29,56 +29,65 @@ struct TextToolControls: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            Picker("", selection: $text.fontName) {
-                ForEach(Self.fontChoices, id: \.self) { Text($0).tag($0) }
-            }
-            .frame(width: 130)
-            .labelsHidden()
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Size").font(.caption2).foregroundStyle(.secondary)
-                Stepper(value: $text.fontSize, in: 6...144, step: 1) {
-                    Text("\(Int(text.fontSize))").monospacedDigit().frame(width: 28)
+        HStack(spacing: 14) {
+            ControlGroupBox(label: "Text") {
+                Picker("", selection: $text.fontName) {
+                    ForEach(Self.fontChoices, id: \.self) { Text($0).tag($0) }
                 }
+                .frame(width: 130)
+                .labelsHidden()
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Size").font(.caption2).foregroundStyle(.secondary)
+                    Stepper(value: $text.fontSize, in: 6...144, step: 1) {
+                        Text("\(Int(text.fontSize))").monospacedDigit().frame(width: 28)
+                    }
+                }
+
+                ColorSwatchWithHex(color: $text.textColor)
+
+                Picker("", selection: $text.alignment) {
+                    Image(systemName: "text.alignleft").tag(TextAlignment.leading)
+                    Image(systemName: "text.aligncenter").tag(TextAlignment.center)
+                    Image(systemName: "text.alignright").tag(TextAlignment.trailing)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 100)
+                .labelsHidden()
             }
 
-            ColorSwatchWithHex(color: $text.textColor)
-
-            Picker("", selection: $text.alignment) {
-                Image(systemName: "text.alignleft").tag(TextAlignment.leading)
-                Image(systemName: "text.aligncenter").tag(TextAlignment.center)
-                Image(systemName: "text.alignright").tag(TextAlignment.trailing)
+            ControlGroupBox(label: "Border") {
+                IconToggleButton(
+                    icon: "square.dashed",
+                    label: "Border",
+                    isOn: Binding(get: { text.border != nil }, set: { text.border = $0 ? (text.border ?? defaultBorderStyle) : nil })
+                )
+                BorderStylePicker(border: Binding(
+                    get: { text.border ?? defaultBorderStyle },
+                    set: { text.border = $0 }
+                ))
             }
-            .pickerStyle(.segmented)
-            .frame(width: 100)
-            .labelsHidden()
 
-            Divider().frame(height: 32)
-
-            BorderStylePicker(border: Binding(
-                get: { text.border ?? defaultBorderStyle },
-                set: { text.border = $0 }
-            ))
-            Toggle("Border", isOn: Binding(get: { text.border != nil }, set: { text.border = $0 ? (text.border ?? defaultBorderStyle) : nil }))
-                .toggleStyle(.checkbox)
-
-            Divider().frame(height: 32)
-
-            Toggle("Shadow", isOn: Binding(
-                get: { text.shadow != nil },
-                set: { text.shadow = $0 ? (text.shadow ?? .defaultStyle) : nil }
-            ))
-            .toggleStyle(.checkbox)
-
-            Toggle("Outline", isOn: Binding(
-                get: { text.outline != nil },
-                set: { text.outline = $0 ? (text.outline ?? TextOutlineStyle(color: .white, width: 1.5)) : nil }
-            ))
-            .toggleStyle(.checkbox)
+            ControlGroupBox(label: "Effects") {
+                IconToggleButton(
+                    icon: "square.fill.on.square.fill",
+                    label: "Shadow",
+                    isOn: Binding(
+                        get: { text.shadow != nil },
+                        set: { text.shadow = $0 ? (text.shadow ?? .defaultStyle) : nil }
+                    )
+                )
+                IconToggleButton(
+                    icon: "circle.dotted",
+                    label: "Outline",
+                    isOn: Binding(
+                        get: { text.outline != nil },
+                        set: { text.outline = $0 ? (text.outline ?? TextOutlineStyle(color: .white, width: 1.5)) : nil }
+                    )
+                )
+            }
         }
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
-        .padding(.horizontal, 16)
     }
 }
