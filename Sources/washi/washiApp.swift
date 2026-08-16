@@ -24,6 +24,7 @@ struct WashiApp: App {
             // `UndoStack`, not an `NSUndoManager`). Replacing it with an
             // empty group removes the competing claimant.
             CommandGroup(replacing: .undoRedo) {}
+            ArrangeCommands()
         }
     }
 }
@@ -226,6 +227,21 @@ private struct EditorView: View {
         }
         .environmentObject(store)
         .background(Color(nsColor: .windowBackgroundColor))
+        .focusedSceneValue(\.arrangeActions, ArrangeActions(
+            hasSelection: store.selectedPageID != nil && !store.selectedElementIDs.isEmpty,
+            bringToFront: {
+                if let pageID = store.selectedPageID { store.bringToFront(store.selectedElementIDs, onPageID: pageID) }
+            },
+            bringForward: {
+                if let pageID = store.selectedPageID { store.bringForward(store.selectedElementIDs, onPageID: pageID) }
+            },
+            sendBackward: {
+                if let pageID = store.selectedPageID { store.sendBackward(store.selectedElementIDs, onPageID: pageID) }
+            },
+            sendToBack: {
+                if let pageID = store.selectedPageID { store.sendToBack(store.selectedElementIDs, onPageID: pageID) }
+            }
+        ))
         .onChange(of: store.activeTool) { _, newTool in
             if newTool == .addImage {
                 presentImagePicker()
