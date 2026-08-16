@@ -16,7 +16,6 @@ struct ToolControlBar: View {
         }
         .frame(height: 108)
         .frame(maxWidth: .infinity)
-        .background(.bar)
     }
 
     @ViewBuilder
