@@ -37,6 +37,17 @@ final class ProjectStore: ObservableObject {
     /// (double-click to enter, spec §14 edge case handled by
     /// `ProjectStore+TextEditing`), or nil when nothing is being edited.
     @Published var editingTextElementID: UUID?
+    /// True while a layer's custom name is being edited in the Properties
+    /// panel's Layers list (double-click to enter). Checked alongside
+    /// `editingTextElementID` everywhere app-level keyboard shortcuts are
+    /// guarded, so e.g. arrow keys move the text cursor instead of
+    /// changing pages while renaming.
+    @Published var isRenamingLayer: Bool = false
+
+    /// Whether some other text field is actively capturing keystrokes, so
+    /// app-level keyboard shortcuts (tool switches, delete, page nav, ...)
+    /// should stand down and let the keystroke reach that field instead.
+    var isEditingText: Bool { editingTextElementID != nil || isRenamingLayer }
 
     // Pending style templates for the next placed element (spec §5.2/D12).
     @Published var pendingTextStyle: TextElement = .makeDefault()

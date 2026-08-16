@@ -19,7 +19,7 @@ struct PageFilmstripView: View {
                 Image(systemName: "chevron.left")
             }
             .keyboardShortcut(.leftArrow, modifiers: [])
-            .disabled(currentIndex <= 0 || store.editingTextElementID != nil)
+            .disabled(currentIndex <= 0 || store.isEditingText)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -44,7 +44,7 @@ struct PageFilmstripView: View {
                 Image(systemName: "chevron.right")
             }
             .keyboardShortcut(.rightArrow, modifiers: [])
-            .disabled(currentIndex >= units.count - 1 || store.editingTextElementID != nil)
+            .disabled(currentIndex >= units.count - 1 || store.isEditingText)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)

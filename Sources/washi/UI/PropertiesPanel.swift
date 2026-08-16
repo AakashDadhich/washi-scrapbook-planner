@@ -163,6 +163,7 @@ struct PropertiesPanel: View {
                 .onExitCommand {
                     renamingElementID = nil
                     focusedField = nil
+                    store.isRenamingLayer = false
                 }
                 .onChange(of: focusedField) { _, newValue in
                     if renamingElementID == element.id && newValue != fieldKey {
@@ -187,12 +188,14 @@ struct PropertiesPanel: View {
     private func beginRename(_ element: PageElement) {
         renameText = element.customName ?? store.elementDisplayName(element)
         renamingElementID = element.id
+        store.isRenamingLayer = true
     }
 
     private func commitRename(_ id: UUID, pageID: UUID) {
         store.renameLayer(id, to: renameText, onPageID: pageID)
         renamingElementID = nil
         focusedField = nil
+        store.isRenamingLayer = false
         // Matches the numberRow pattern: drop first responder so a
         // trailing Cmd+Z reaches the app-level undo shortcut instead of
         // the field editor's own empty undo manager.
