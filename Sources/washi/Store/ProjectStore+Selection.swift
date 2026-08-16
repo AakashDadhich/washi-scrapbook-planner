@@ -344,23 +344,11 @@ extension ProjectStore {
     }
 
     func bringForward(_ ids: Set<UUID>, onPageID pageID: UUID) {
-        reorderLayer(ids, onPageID: pageID) { elements, targets in
-            for id in targets {
-                if let i = elements.firstIndex(where: { $0.id == id }) {
-                    elements[i].zIndex += 1
-                }
-            }
-        }
+        stepReorder(ids, onPageID: pageID, direction: .forward)
     }
 
     func sendBackward(_ ids: Set<UUID>, onPageID pageID: UUID) {
-        reorderLayer(ids, onPageID: pageID) { elements, targets in
-            for id in targets {
-                if let i = elements.firstIndex(where: { $0.id == id }) {
-                    elements[i].zIndex -= 1
-                }
-            }
-        }
+        stepReorder(ids, onPageID: pageID, direction: .backward)
     }
 
     private func reorderLayer(_ ids: Set<UUID>, onPageID pageID: UUID, _ mutate: (inout [PageElement], [UUID]) -> Void) {
@@ -369,6 +357,41 @@ extension ProjectStore {
         mutate(&elements, Array(ids))
         withUndoCheckpoint {
             project.album.pages[idx].elements = elements
+        }
+        markDirty()
+    }
+
+    private enum StepDirection { case forward, backward }
+
+    /// Moves each targeted element exactly one visual position past its nearest
+    /// non-targeted neighbor, then reassigns every element's zIndex to a unique
+    /// contiguous value. A plain `zIndex += 1`/`-= 1` can tie two elements'
+    /// zIndex together; the Layers list (sorts descending) and the canvas
+    /// (sorts ascending) then resolve that tie in opposite directions via
+    /// Swift's stable sort, desyncing what's shown from what's rendered.
+    /// Renumbering after every step reorder makes a tie impossible.
+    private func stepReorder(_ ids: Set<UUID>, onPageID pageID: UUID, direction: StepDirection) {
+        guard let idx = pageIndex(for: pageID), !ids.isEmpty else { return }
+        var ordered = layerList(onPageID: pageID) // front-to-back
+        let indices = direction == .forward ? Array(ordered.indices) : Array(ordered.indices.reversed())
+        for i in indices {
+            guard ids.contains(ordered[i].id) else { continue }
+            switch direction {
+            case .forward:
+                guard i > 0, !ids.contains(ordered[i - 1].id) else { continue }
+                ordered.swapAt(i - 1, i)
+            case .backward:
+                guard i < ordered.count - 1, !ids.contains(ordered[i + 1].id) else { continue }
+                ordered.swapAt(i, i + 1)
+            }
+        }
+
+        let count = ordered.count
+        withUndoCheckpoint {
+            for (displayPos, element) in ordered.enumerated() {
+                guard let elIdx = project.album.pages[idx].elements.firstIndex(where: { $0.id == element.id }) else { continue }
+                project.album.pages[idx].elements[elIdx].zIndex = count - displayPos
+            }
         }
         markDirty()
     }
