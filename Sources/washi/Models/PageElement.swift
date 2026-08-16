@@ -13,14 +13,19 @@ struct PageElement: Codable, Identifiable, Equatable {
     /// key, so the default only takes effect via the explicit
     /// `decodeIfPresent` below.
     var isVisible: Bool = true
+    /// User-assigned name shown in the Layers list in place of the
+    /// auto-generated one (§ layer list, issue #2). `nil` means "use the
+    /// auto-generated name" — absent on older saves, which decode as `nil`.
+    var customName: String?
     var content: ElementContent
 
-    init(id: UUID, transform: Transform2D, zIndex: Int, isLocked: Bool, isVisible: Bool = true, content: ElementContent) {
+    init(id: UUID, transform: Transform2D, zIndex: Int, isLocked: Bool, isVisible: Bool = true, customName: String? = nil, content: ElementContent) {
         self.id = id
         self.transform = transform
         self.zIndex = zIndex
         self.isLocked = isLocked
         self.isVisible = isVisible
+        self.customName = customName
         self.content = content
     }
 
@@ -31,6 +36,7 @@ struct PageElement: Codable, Identifiable, Equatable {
         zIndex = try container.decode(Int.self, forKey: .zIndex)
         isLocked = try container.decode(Bool.self, forKey: .isLocked)
         isVisible = try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? true
+        customName = try container.decodeIfPresent(String.self, forKey: .customName)
         content = try container.decode(ElementContent.self, forKey: .content)
     }
 }

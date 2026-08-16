@@ -8,6 +8,8 @@ import AppKit
 struct PropertiesPanel: View {
     @EnvironmentObject var store: ProjectStore
     @FocusState private var focusedField: String?
+    @State private var renamingElementID: UUID?
+    @State private var renameText: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -138,20 +140,63 @@ struct PropertiesPanel: View {
                     .help("This element is fully off the page")
             }
 
-            Text(store.elementDisplayName(element))
-                .font(.caption)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    store.selectElement(element.id, onPageID: pageID, extend: false)
-                }
+            layerNameField(element, pageID: pageID)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
         .onDrag { NSItemProvider(object: element.id.uuidString as NSString) }
         .onDrop(of: [.text], delegate: LayerDropDelegate(destinationIndex: index, pageID: pageID, store: store))
+    }
+
+    @ViewBuilder
+    private func layerNameField(_ element: PageElement, pageID: UUID) -> some View {
+        let fieldKey = "layerName-\(element.id.uuidString)"
+        if renamingElementID == element.id {
+            TextField("", text: $renameText)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .focused($focusedField, equals: fieldKey)
+                .onSubmit {
+                    commitRename(element.id, pageID: pageID)
+                }
+                .onExitCommand {
+                    renamingElementID = nil
+                    focusedField = nil
+                }
+                .onChange(of: focusedField) { _, newValue in
+                    if renamingElementID == element.id && newValue != fieldKey {
+                        commitRename(element.id, pageID: pageID)
+                    }
+                }
+                .onAppear { focusedField = fieldKey }
+        } else {
+            let doubleTap = TapGesture(count: 2).onEnded { beginRename(element) }
+            let singleTap = TapGesture(count: 1).onEnded {
+                store.selectElement(element.id, onPageID: pageID, extend: false)
+            }
+            Text(store.elementDisplayName(element))
+                .font(.caption)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .gesture(doubleTap.exclusively(before: singleTap))
+        }
+    }
+
+    private func beginRename(_ element: PageElement) {
+        renameText = element.customName ?? store.elementDisplayName(element)
+        renamingElementID = element.id
+    }
+
+    private func commitRename(_ id: UUID, pageID: UUID) {
+        store.renameLayer(id, to: renameText, onPageID: pageID)
+        renamingElementID = nil
+        focusedField = nil
+        // Matches the numberRow pattern: drop first responder so a
+        // trailing Cmd+Z reaches the app-level undo shortcut instead of
+        // the field editor's own empty undo manager.
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     private func isFullyOffPage(_ element: PageElement, pageID: UUID) -> Bool {

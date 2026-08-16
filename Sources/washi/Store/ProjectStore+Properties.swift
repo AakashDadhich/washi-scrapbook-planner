@@ -123,6 +123,9 @@ extension ProjectStore {
     }
 
     func elementDisplayName(_ element: PageElement) -> String {
+        if let customName = element.customName?.trimmingCharacters(in: .whitespacesAndNewlines), !customName.isEmpty {
+            return customName
+        }
         switch element.content {
         case .text(let text):
             let trimmed = text.string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,5 +137,16 @@ extension ProjectStore {
         case .frame:
             return "Frame"
         }
+    }
+
+    /// Sets a custom layer name, or clears it (falling back to the
+    /// auto-generated name) when `name` is empty/whitespace-only.
+    func renameLayer(_ id: UUID, to name: String, onPageID pageID: UUID) {
+        guard let idx = elementIndex(id, onPageID: pageID), let pIdx = pageIndex(for: pageID) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        withUndoCheckpoint {
+            project.album.pages[pIdx].elements[idx].customName = trimmed.isEmpty ? nil : trimmed
+        }
+        markDirty()
     }
 }
