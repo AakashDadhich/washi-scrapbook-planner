@@ -44,4 +44,11 @@ struct ColorValue: Codable, Equatable, Hashable {
     static let white = ColorValue(hex: "#FFFFFF")
     static let black = ColorValue(hex: "#0A0A0A")
     static let kraftBrown = ColorValue(hex: "#C8A97E")
+
+    /// Perceived-brightness check used to pick a readable default text/
+    /// border color against this color when it's used as a page background
+    /// (issue #1 — dark backgrounds were pairing with near-black defaults).
+    var isDark: Bool {
+        0.299 * red + 0.587 * green + 0.114 * blue < 0.5
+    }
 }

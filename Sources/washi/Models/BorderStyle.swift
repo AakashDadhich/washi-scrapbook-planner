@@ -31,6 +31,14 @@ extension BorderStyle {
         cornerStyle: .sharp
     )
 
+    /// `.defaultStyle` with a different color, for callers that need a
+    /// contrast-aware default border color (issue #1).
+    static func defaultStyle(color: ColorValue) -> BorderStyle {
+        var style = defaultStyle
+        style.color = color
+        return style
+    }
+
     /// One representative style per `BorderShape` case, for gallery thumbnails (§5.5).
     static let shapeGalleryDefaults: [BorderStyle] = [
         BorderStyle(shape: .straight, thickness: 2, color: ColorValue(hex: "#333333"), cornerStyle: .sharp),

@@ -25,7 +25,9 @@ enum NavigationKind: Equatable {
 final class ProjectStore: ObservableObject {
     @Published var project: Project
     @Published private(set) var hasUnsavedChanges: Bool = false
-    @Published var selectedPageID: UUID?
+    @Published var selectedPageID: UUID? {
+        didSet { syncPendingDefaultColors() }
+    }
     @Published var activeTool: Tool = .select
     @Published var filmstripMultiSelection: Set<UUID> = []
     @Published var lastNavigationKind: NavigationKind = .crossfade
@@ -48,6 +50,11 @@ final class ProjectStore: ObservableObject {
     @Published var pendingStickerTint: ColorValue? = ColorValue(hex: "#E38FB0")
     @Published var pendingFrameBorder: BorderStyle = .defaultStyle
     @Published var pendingFrameFill: ColorValue?
+    /// The color last auto-applied to `pendingTextStyle`/`pendingFrameBorder`
+    /// by `syncPendingDefaultColors()`, so a background-driven resync never
+    /// clobbers a color the user deliberately picked (issue #1).
+    private var autoAppliedTextColor: ColorValue = .black
+    private var autoAppliedBorderColor: ColorValue = ColorValue(hex: "#333333")
 
     let undoStack = UndoStack()
     /// The state captured at the *start* of an in-progress drag/resize/
@@ -86,6 +93,34 @@ final class ProjectStore: ObservableObject {
     func markDirty() {
         hasUnsavedChanges = true
         project.modifiedAt = Date()
+    }
+
+    // MARK: - Background-aware element defaults (issue #1)
+
+    var currentPageBackgroundIsDark: Bool {
+        selectedPageID.flatMap(page(for:))?.background.isDark ?? false
+    }
+
+    /// Keeps `pendingTextStyle.textColor`/`pendingFrameBorder.color` readable
+    /// against the current page's background. Only overwrites the color if
+    /// it still matches the last value this method applied, so a color the
+    /// user deliberately picked in the tool control bar is never silently
+    /// reverted by a page switch or background change. Call whenever
+    /// `selectedPageID` changes or the current page's background changes.
+    func syncPendingDefaultColors() {
+        let isDark = currentPageBackgroundIsDark
+        let newTextColor: ColorValue = isDark ? .white : .black
+        let newBorderColor: ColorValue = isDark ? .white : ColorValue(hex: "#333333")
+
+        if pendingTextStyle.textColor == autoAppliedTextColor {
+            pendingTextStyle.textColor = newTextColor
+        }
+        autoAppliedTextColor = newTextColor
+
+        if pendingFrameBorder.color == autoAppliedBorderColor {
+            pendingFrameBorder.color = newBorderColor
+        }
+        autoAppliedBorderColor = newBorderColor
     }
 
     // MARK: - Undo/redo (spec §8)
