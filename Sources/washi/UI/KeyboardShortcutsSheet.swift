@@ -6,20 +6,20 @@ struct KeyboardShortcutsSheet: View {
     @Environment(\.dismiss) var dismiss
 
     private let rows: [(shortcut: String, action: String)] = [
-        ("⌘N", "New project"),
-        ("⌘O", "Open project"),
-        ("⌘S / ⇧⌘S", "Save / Save As"),
-        ("⌘Z / ⇧⌘Z", "Undo / Redo"),
-        ("⌘G / ⇧⌘G", "Group / Ungroup"),
-        ("⌘D", "Duplicate selection"),
-        ("Delete", "Delete selected element(s) (no confirmation — undoable)"),
-        ("→ / ←", "Next / previous page (with flip animation)"),
+        ("⌘ + N", "New project"),
+        ("⌘ + O", "Open project"),
+        ("(⇧) + ⌘ + S", "Save (Save As)"),
+        ("(⇧) + ⌘ + Z", "Undo (Redo)"),
+        ("(⇧) + ⌘ + G", "Group (Ungroup)"),
+        ("⌘ + D", "Duplicate selection"),
+        ("Del", "Delete selected element(s) (no confirmation — undoable)"),
+        ("← / →", "Previous / next page"),
         ("⇧ + drag (rotate handle)", "Snap rotation to 15°"),
-        ("⌘A", "Select all elements on current page/spread"),
-        ("⇧⌘I", "Import photo"),
-        ("⌘E", "Export PDF"),
+        ("⌘ + A", "Select all elements on current page/spread"),
+        ("⇧ + ⌘ + I", "Import photo"),
+        ("⌘ + E", "Export PDF"),
         ("1–7", "Switch left-toolbar tool (Select, Add Page, Add Text, Add Image, Add Sticker, Add Border/Frame, Background)"),
-        ("⌘/", "Open Keyboard Shortcuts sheet (same as the Info button)")
+        ("⌘ + /", "Open Keyboard Shortcuts sheet (same as the Info button)")
     ]
 
     var body: some View {
@@ -32,7 +32,7 @@ struct KeyboardShortcutsSheet: View {
                         HStack {
                             Text(row.shortcut)
                                 .font(.system(.body, design: .monospaced))
-                                .frame(width: 180, alignment: .leading)
+                                .frame(width: 220, alignment: .leading)
                             Text(row.action)
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
