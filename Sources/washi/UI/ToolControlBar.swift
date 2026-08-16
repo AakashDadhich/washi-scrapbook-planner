@@ -7,8 +7,11 @@ struct ToolControlBar: View {
     @EnvironmentObject var store: ProjectStore
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            content
+        GeometryReader { geo in
+            ScrollView(.horizontal, showsIndicators: false) {
+                content
+                    .frame(minWidth: geo.size.width, alignment: .center)
+            }
         }
         .frame(height: 76)
         .frame(maxWidth: .infinity)

@@ -19,23 +19,26 @@ struct PageFilmstripView: View {
             .keyboardShortcut(.leftArrow, modifiers: [])
             .disabled(currentIndex <= 0 || store.isEditingText)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(units.enumerated()), id: \.element.id) { index, unit in
-                        thumbnail(for: unit, index: index, isCurrent: index == currentIndex, units: units)
-                    }
+            GeometryReader { geo in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(units.enumerated()), id: \.element.id) { index, unit in
+                            thumbnail(for: unit, index: index, isCurrent: index == currentIndex, units: units)
+                        }
 
-                    Menu {
-                        Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
-                        Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
-                    } label: {
-                        Image(systemName: "plus")
+                        Menu {
+                            Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
+                            Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .frame(width: 40, height: 56)
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .frame(width: 40, height: 56)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: geo.size.width, alignment: .center)
                 }
-                .padding(.horizontal, 4)
             }
 
             Button(action: onNext) {
