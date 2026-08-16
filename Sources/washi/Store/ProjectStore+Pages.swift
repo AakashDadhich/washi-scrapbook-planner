@@ -15,6 +15,18 @@ extension ProjectStore {
         return u[currentUnitIndex]
     }
 
+    /// Whether any page in the currently displayed unit (single page, or
+    /// either half of a spread) has an element fully outside its page
+    /// bounds — used to keep the off-canvas recovery UI in the Properties
+    /// panel reachable even when nothing is selected (issue #13).
+    var currentUnitHasOffPageElement: Bool {
+        guard let unit = currentUnit else { return false }
+        return unit.pageIDs.contains { pageID in
+            guard let page = page(for: pageID) else { return false }
+            return page.elements.contains(where: page.isElementFullyOffPage)
+        }
+    }
+
     // MARK: - Navigation
 
     func selectUnit(at index: Int) {

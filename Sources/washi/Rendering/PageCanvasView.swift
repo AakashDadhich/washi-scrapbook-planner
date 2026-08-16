@@ -43,6 +43,12 @@ struct PageCanvasView: View {
     @State private var rotateCenterCm: CGPoint = .zero
     @State private var lastClickTime: Date = .distantPast
     @State private var lastClickedElementID: UUID?
+    /// Scale and screen origin frozen at the start of the current gesture
+    /// (see `beginInteraction`) so that a layout change mid-gesture — e.g.
+    /// the Properties panel opening/closing and resizing the canvas — can't
+    /// change how the rest of that same gesture's movement is interpreted.
+    @State private var interactionScale: CGFloat = 1
+    @State private var interactionOriginGlobal: CGPoint = .zero
 
     private let handleHitRadius: CGFloat = 11
 
@@ -90,8 +96,11 @@ struct PageCanvasView: View {
                         }
                     }
                 }
-                .contentShape(Rectangle())
-                .gesture(canvasGesture(scale: scale), including: (isInteractive && store.editingTextElementID == nil) ? .all : .none)
+                .contentShape(interactiveShape(scale: scale, pageSizePt: geo.size))
+                .gesture(
+                    canvasGesture(scale: scale, originGlobal: geo.frame(in: .global).origin),
+                    including: (isInteractive && store.editingTextElementID == nil) ? .all : .none
+                )
 
                 if isInteractive, store.editingTextElementID != nil {
                     // Sits below the live text editor overlay: a click that
@@ -111,28 +120,36 @@ struct PageCanvasView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .coordinateSpace(name: "page")
         }
         .aspectRatio(page.size.widthCm / page.size.heightCm, contentMode: .fit)
     }
 
     // MARK: - Unified gesture
 
-    private func canvasGesture(scale: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("page"))
+    /// Uses `.global` (window-relative) coordinates rather than this view's
+    /// own "page" frame: that frame's size and position change mid-gesture
+    /// whenever the Properties panel opens/closes (it resizes the canvas),
+    /// and a coordinate space that moves under an in-flight gesture turns
+    /// small mouse movements into large, spurious translations. `.global`
+    /// doesn't shift when a sibling view's layout changes, so it stays
+    /// correct for the whole gesture; `beginInteraction` then freezes the
+    /// scale/origin needed to translate those global points into this
+    /// page's own point space for the rest of that same gesture.
+    private func canvasGesture(scale: CGFloat, originGlobal: CGPoint) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
                 guard scale > 0 else { return }
                 if interaction == .idle {
-                    beginInteraction(at: value.startLocation, scale: scale)
+                    beginInteraction(atGlobal: value.startLocation, scale: scale, originGlobal: originGlobal)
                 }
-                continueInteraction(value: value, scale: scale)
+                continueInteraction(value: value)
             }
             .onEnded { value in
                 guard scale > 0 else { return }
                 if interaction == .idle {
-                    beginInteraction(at: value.startLocation, scale: scale)
+                    beginInteraction(atGlobal: value.startLocation, scale: scale, originGlobal: originGlobal)
                 }
-                endInteraction(value: value, scale: scale)
+                endInteraction(value: value)
                 interaction = .idle
                 moveStartTransforms = [:]
                 resizeStartTransforms = [:]
@@ -142,7 +159,11 @@ struct PageCanvasView: View {
             }
     }
 
-    private func beginInteraction(at locationPt: CGPoint, scale: CGFloat) {
+    private func beginInteraction(atGlobal globalPoint: CGPoint, scale: CGFloat, originGlobal: CGPoint) {
+        interactionScale = scale
+        interactionOriginGlobal = originGlobal
+        let locationPt = CGPoint(x: globalPoint.x - originGlobal.x, y: globalPoint.y - originGlobal.y)
+
         if store.selectedPageID == page.id, !store.selectedElementIDs.isEmpty, !selectionIsLocked,
            let bounds = selectionBoundsPt(scale: scale) {
             let centerPt = CGPoint(x: bounds.midX, y: bounds.midY)
@@ -203,7 +224,15 @@ struct PageCanvasView: View {
         }
     }
 
-    private func continueInteraction(value: DragGesture.Value, scale: CGFloat) {
+    /// Converts a `.global`-space gesture point into this page's own point
+    /// space, using the scale/origin frozen at gesture-start rather than
+    /// whatever they currently are — see `canvasGesture`.
+    private func frozenPagePoint(fromGlobal globalPoint: CGPoint) -> CGPoint {
+        CGPoint(x: globalPoint.x - interactionOriginGlobal.x, y: globalPoint.y - interactionOriginGlobal.y)
+    }
+
+    private func continueInteraction(value: DragGesture.Value) {
+        let scale = interactionScale
         switch interaction {
         case .move:
             guard !moveStartTransforms.isEmpty else { return }
@@ -216,7 +245,8 @@ struct PageCanvasView: View {
             store.applyResizePreview(onPageID: page.id, startTransforms: resizeStartTransforms, combinedStartBounds: resizeStartBounds, handle: handle, rawDeltaCm: rawDeltaCm, proportional: proportional)
         case .rotate:
             let centerPt = CGPoint(x: rotateCenterCm.x * scale, y: rotateCenterCm.y * scale)
-            let currentAngle = TransformMath.angleDegrees(center: centerPt, point: value.location)
+            let locationPt = frozenPagePoint(fromGlobal: value.location)
+            let currentAngle = TransformMath.angleDegrees(center: centerPt, point: locationPt)
             var delta = currentAngle - rotateStartAngle
             if NSEvent.modifierFlags.contains(.shift) {
                 let originalRotation = rotateStartTransforms.first?.value.rotationDegrees ?? 0
@@ -224,23 +254,25 @@ struct PageCanvasView: View {
             }
             store.applyRotatePreview(onPageID: page.id, startTransforms: rotateStartTransforms, combinedCenter: rotateCenterCm, deltaDegrees: delta)
         case .marquee:
-            marqueeCurrent = value.location
+            marqueeCurrent = frozenPagePoint(fromGlobal: value.location)
         case .place, .idle:
             break
         }
     }
 
-    private func endInteraction(value: DragGesture.Value, scale: CGFloat) {
+    private func endInteraction(value: DragGesture.Value) {
+        let scale = interactionScale
         switch interaction {
         case .move, .resize, .rotate:
             store.endInteraction()
         case .marquee:
             guard let start = marqueeStart else { return }
+            let currentPt = frozenPagePoint(fromGlobal: value.location)
             let dragDistance = hypot(value.translation.width, value.translation.height)
             if dragDistance > 3 {
                 let rectPt = CGRect(
-                    x: min(start.x, value.location.x), y: min(start.y, value.location.y),
-                    width: abs(value.location.x - start.x), height: abs(value.location.y - start.y)
+                    x: min(start.x, currentPt.x), y: min(start.y, currentPt.y),
+                    width: abs(currentPt.x - start.x), height: abs(currentPt.y - start.y)
                 )
                 let rectCm = CGRect(x: rectPt.minX / scale, y: rectPt.minY / scale, width: rectPt.width / scale, height: rectPt.height / scale)
                 store.selectElements(intersecting: rectCm, onPageID: page.id)
@@ -249,7 +281,8 @@ struct PageCanvasView: View {
                 store.clearElementSelection()
             }
         case .place:
-            let cmPoint = CGPoint(x: value.location.x / scale, y: value.location.y / scale)
+            let locationPt = frozenPagePoint(fromGlobal: value.location)
+            let cmPoint = CGPoint(x: locationPt.x / scale, y: locationPt.y / scale)
             switch store.activeTool {
             case .addText:
                 store.placeDefaultText(onPageID: page.id, atCm: cmPoint)
@@ -261,6 +294,24 @@ struct PageCanvasView: View {
         case .idle:
             break
         }
+    }
+
+    /// The gesture's hit-testable region: the page rect, plus the own
+    /// (unrotated) bounding box of any element that's fully off-page. The
+    /// page itself doesn't clip its content, so an off-page element can
+    /// still be visible in the unused margin around it — this lets the
+    /// user click and drag it straight back rather than only being able to
+    /// reselect it indirectly via the Layers list (issue #13). Kept
+    /// element-shaped rather than a blanket margin expansion so it doesn't
+    /// swallow clicks meant for floating chrome like the tool rail.
+    private func interactiveShape(scale: CGFloat, pageSizePt: CGSize) -> Path {
+        var path = Path(CGRect(origin: .zero, size: pageSizePt))
+        guard isInteractive else { return path }
+        for element in page.elements where element.isVisible && page.isElementFullyOffPage(element) {
+            let r = element.transform.unrotatedRect
+            path.addRect(CGRect(x: r.minX * scale, y: r.minY * scale, width: r.width * scale, height: r.height * scale))
+        }
+        return path
     }
 
     // MARK: - Hit-testing
