@@ -1,12 +1,16 @@
 import SwiftUI
 import AppKit
 
-/// Page navigation strip below the canvas (spec §5.4) — the only
-/// page-navigation UI, no separate sidebar.
+/// Floating page navigation strip over the canvas, centered under the
+/// current page/spread (spec §5.4) — the only page-navigation UI, no
+/// separate sidebar. Sized to its own content rather than the window
+/// width, capped by `maxCardWidth` and scrolling internally beyond that.
 struct PageFilmstripView: View {
     @EnvironmentObject var store: ProjectStore
     var onPrev: () -> Void
     var onNext: () -> Void
+
+    private let maxCardWidth: CGFloat = 480
 
     var body: some View {
         let units = store.units
@@ -19,26 +23,23 @@ struct PageFilmstripView: View {
             .keyboardShortcut(.leftArrow, modifiers: [])
             .disabled(currentIndex <= 0 || store.isEditingText)
 
-            GeometryReader { geo in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(units.enumerated()), id: \.element.id) { index, unit in
-                            thumbnail(for: unit, index: index, isCurrent: index == currentIndex, units: units)
-                        }
-
-                        Menu {
-                            Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
-                            Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        .frame(width: 40, height: 56)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(units.enumerated()), id: \.element.id) { index, unit in
+                        thumbnail(for: unit, index: index, isCurrent: index == currentIndex, units: units)
                     }
-                    .padding(.horizontal, 4)
-                    .frame(minWidth: geo.size.width, alignment: .center)
+
+                    Menu {
+                        Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
+                        Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .frame(width: 40, height: 56)
                 }
+                .padding(.horizontal, 4)
             }
 
             Button(action: onNext) {
@@ -48,10 +49,12 @@ struct PageFilmstripView: View {
             .disabled(currentIndex >= units.count - 1 || store.isEditingText)
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(height: 80)
-        .background(.bar)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: maxCardWidth)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.separator, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
         .confirmationDialog(
             deletionTitle(for: store.pendingPageUnitDeletion),
             isPresented: Binding(get: { store.pendingPageUnitDeletion != nil }, set: { if !$0 { store.pendingPageUnitDeletion = nil } }),

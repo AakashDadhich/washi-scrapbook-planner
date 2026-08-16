@@ -182,10 +182,20 @@ private struct EditorView: View {
                         canvasArea
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+                        // Reserves whitespace between the canvas and the
+                        // tool control bar for the floating filmstrip, so
+                        // the canvas never grows into it and the card never
+                        // sits over page content. Pinned to the top of the
+                        // strip (close to the canvas, as before) with more
+                        // room left below it than above, so it doesn't
+                        // crowd the tool control bar.
                         PageFilmstripView(
                             onPrev: { store.goToPreviousUnit() },
                             onNext: { store.goToNextUnit() }
                         )
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
 
                         ToolControlBar()
                     }
