@@ -121,7 +121,7 @@ struct PropertiesPanel: View {
 
     private func layerRow(_ element: PageElement, index: Int, pageID: UUID) -> some View {
         let isSelected = store.selectedElementIDs.contains(element.id)
-        let isOffPage = isFullyOffPage(element, pageID: pageID)
+        let isOffPage = store.page(for: pageID)?.isElementFullyOffPage(element) ?? false
         let isRenamingElsewhere = store.renamingLayerID != nil && store.renamingLayerID != element.id
 
         return HStack(spacing: 6) {
@@ -210,11 +210,6 @@ struct PropertiesPanel: View {
         NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
-    private func isFullyOffPage(_ element: PageElement, pageID: UUID) -> Bool {
-        guard let page = store.page(for: pageID) else { return false }
-        let pageRect = CGRect(x: 0, y: 0, width: page.size.widthCm, height: page.size.heightCm)
-        return !pageRect.intersects(element.transform.unrotatedRect)
-    }
 }
 
 private struct LayerDropDelegate: DropDelegate {

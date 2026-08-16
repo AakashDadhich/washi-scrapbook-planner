@@ -213,7 +213,13 @@ private struct EditorView: View {
                 }
                 .overlay(selectionShortcuts)
 
-                if !store.selectedElementIDs.isEmpty {
+                // Also shown with an empty selection when the current page/
+                // spread has an off-canvas element, so its Layers-list
+                // warning icon and select-by-name recovery path stay
+                // reachable even after the element that needs recovering
+                // gets deselected (issue #13) — without permanently
+                // reserving this space when there's nothing to recover.
+                if !store.selectedElementIDs.isEmpty || store.currentUnitHasOffPageElement {
                     PropertiesPanel()
                 }
             }
