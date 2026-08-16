@@ -64,6 +64,7 @@ extension ProjectStore {
             project.album.pages[idx].background = background
         }
         markDirty()
+        syncPendingDefaultColors()
     }
 
     /// Changes only this page's size — never touches its elements' transforms,

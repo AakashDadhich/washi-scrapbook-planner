@@ -21,7 +21,7 @@ struct ToolControlBar: View {
         case .select:
             selectStateContent
         case .addText:
-            TextToolControls(text: $store.pendingTextStyle, isEnabled: true)
+            TextToolControls(text: $store.pendingTextStyle, isEnabled: true, isBackgroundDark: store.currentPageBackgroundIsDark)
         case .addImage:
             ImageToolControls(
                 border: $store.pendingImageBorder,
@@ -64,7 +64,8 @@ struct ToolControlBar: View {
             case .text(let text):
                 TextToolControls(
                     text: Binding(get: { text }, set: { newValue in store.updateSelectedText { $0 = newValue } }),
-                    isEnabled: true
+                    isEnabled: true,
+                    isBackgroundDark: store.currentPageBackgroundIsDark
                 )
             case .image(let image):
                 ImageToolControls(
@@ -87,7 +88,11 @@ struct ToolControlBar: View {
                 )
             }
         } else {
-            TextToolControls(text: .constant(TextToolControls.zeroedTemplate), isEnabled: false)
+            TextToolControls(
+                text: .constant(TextToolControls.zeroedTemplate(isBackgroundDark: store.currentPageBackgroundIsDark)),
+                isEnabled: false,
+                isBackgroundDark: store.currentPageBackgroundIsDark
+            )
         }
     }
 }

@@ -5,6 +5,18 @@ enum PageBackground: Codable, Equatable {
     case custom(assetID: UUID)   // user-imported background/patterned-paper image; v2 candidate, see spec §13
 }
 
+extension PageBackground {
+    /// Whether newly-placed elements need a light default to stay visible
+    /// (issue #1). `.custom` has no single representative color and isn't
+    /// reachable in v1 (spec §13), so it's treated as light.
+    var isDark: Bool {
+        switch self {
+        case .solidColor(let color): return color.isDark
+        case .custom: return false
+        }
+    }
+}
+
 /// The starter palette is stored as data (not a hardcoded enum) so more colors
 /// can be added later without a migration, per spec §3.9.
 struct BackgroundColorOption: Codable, Equatable, Identifiable, Hashable {

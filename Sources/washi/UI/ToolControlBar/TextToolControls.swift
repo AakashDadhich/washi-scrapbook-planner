@@ -7,15 +7,26 @@ import SwiftUI
 struct TextToolControls: View {
     @Binding var text: TextElement
     var isEnabled: Bool
+    /// Whether the current page background is dark, so the border-toggle's
+    /// default color (and the disabled placeholder swatch) stay readable
+    /// instead of defaulting to near-black regardless of background (issue #1).
+    var isBackgroundDark: Bool = false
 
     private static let fontChoices = ["Helvetica", "Helvetica Neue", "Georgia", "Times New Roman", "Courier New", "Avenir", "Marker Felt"]
 
+    private var defaultBorderStyle: BorderStyle {
+        .defaultStyle(color: isBackgroundDark ? .white : ColorValue(hex: "#333333"))
+    }
+
     /// The "nothing selected" state (spec §5.5): same layout, every
     /// control disabled/greyed, numeric fields read 0 rather than being hidden.
-    static let zeroedTemplate = TextElement(
-        string: "", fontName: "Helvetica", fontSize: 0, textColor: ColorValue(hex: "#000000"),
-        alignment: .leading, border: nil, backgroundFill: nil, shadow: nil, outline: nil
-    )
+    static func zeroedTemplate(isBackgroundDark: Bool) -> TextElement {
+        TextElement(
+            string: "", fontName: "Helvetica", fontSize: 0,
+            textColor: isBackgroundDark ? .white : ColorValue(hex: "#000000"),
+            alignment: .leading, border: nil, backgroundFill: nil, shadow: nil, outline: nil
+        )
+    }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -46,10 +57,10 @@ struct TextToolControls: View {
             Divider().frame(height: 32)
 
             BorderStylePicker(border: Binding(
-                get: { text.border ?? .defaultStyle },
+                get: { text.border ?? defaultBorderStyle },
                 set: { text.border = $0 }
             ))
-            Toggle("Border", isOn: Binding(get: { text.border != nil }, set: { text.border = $0 ? (text.border ?? .defaultStyle) : nil }))
+            Toggle("Border", isOn: Binding(get: { text.border != nil }, set: { text.border = $0 ? (text.border ?? defaultBorderStyle) : nil }))
                 .toggleStyle(.checkbox)
 
             Divider().frame(height: 32)
