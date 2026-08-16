@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 @main
 struct WashiApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
     }
@@ -81,7 +83,14 @@ final class AppRootState: ObservableObject {
 /// layout for M5 — navigation, element placement, selection, and the real
 /// per-tool control bar contents are wired in M6-M11.
 struct WashiWindowView: View {
-    @StateObject private var root = AppRootState()
+    @StateObject private var root: AppRootState
+    @StateObject private var closeCoordinator: WindowCloseCoordinator
+
+    init() {
+        let root = AppRootState()
+        _root = StateObject(wrappedValue: root)
+        _closeCoordinator = StateObject(wrappedValue: WindowCloseCoordinator(root: root))
+    }
 
     var body: some View {
         Group {
@@ -93,6 +102,7 @@ struct WashiWindowView: View {
             }
         }
         .frame(minWidth: 1000, minHeight: 700)
+        .background(WindowAccessor(coordinator: closeCoordinator))
         .overlay(globalShortcuts)
         .sheet(isPresented: $root.showNewProjectSheet) {
             NewProjectSheet { project in
