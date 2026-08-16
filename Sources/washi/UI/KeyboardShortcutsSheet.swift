@@ -13,6 +13,7 @@ struct KeyboardShortcutsSheet: View {
         ("(⇧) + ⌘ + G", "Group (Ungroup)"),
         ("⌘ + D", "Duplicate selection"),
         ("Del", "Delete selected element(s) (no confirmation — undoable)"),
+        ("⌦", "Delete selected element(s) if any are selected (undoable); otherwise delete the current page/spread (confirmation required)"),
         ("← / →", "Previous / next page"),
         ("⇧ + drag (rotate handle)", "Snap rotation to 15°"),
         ("⌘ + A", "Select all elements on current page/spread"),

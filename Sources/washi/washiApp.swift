@@ -288,6 +288,20 @@ private struct EditorView: View {
             }
             .keyboardShortcut(.delete, modifiers: [])
 
+            // Forward Delete: canvas element(s) if any are selected,
+            // otherwise the current filmstrip page/spread (with the same
+            // confirmation dialog the right-click menu shows). Plain
+            // Delete/Backspace above never deletes a page — this is the
+            // only keyboard path to page deletion, deliberately.
+            Button("") {
+                if let pageID = store.selectedPageID, !store.selectedElementIDs.isEmpty {
+                    store.deleteSelectedElements(onPageID: pageID)
+                } else if let unit = store.currentUnit {
+                    store.pendingPageUnitDeletion = unit
+                }
+            }
+            .keyboardShortcut(.deleteForward, modifiers: [])
+
             Button("") {
                 if let pageID = store.selectedPageID {
                     store.groupSelection(onPageID: pageID)
