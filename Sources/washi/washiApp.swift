@@ -85,6 +85,7 @@ final class AppRootState: ObservableObject {
 struct WashiWindowView: View {
     @StateObject private var root: AppRootState
     @StateObject private var closeCoordinator: WindowCloseCoordinator
+    @Environment(\.colorScheme) private var colorScheme
 
     init() {
         let root = AppRootState()
@@ -162,9 +163,17 @@ struct WashiWindowView: View {
             }
             Spacer()
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.editorPaneBackground(for: colorScheme))
     }
 
+}
+
+extension Color {
+    // Standard system window background in light mode; a darker, near-black
+    // tone in dark mode, matching the editor pane (issue #29).
+    static func editorPaneBackground(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? Color(nsColor: NSColor(white: 0.07, alpha: 1)) : Color(nsColor: .windowBackgroundColor)
+    }
 }
 
 private struct EditorView: View {
@@ -175,12 +184,6 @@ private struct EditorView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showExportSheet = false
     @State private var saveErrorMessage: String?
-
-    // Dark mode gets a darker, near-black pane instead of the standard
-    // system window background (issue #29); light mode is unchanged.
-    private var editorBackground: Color {
-        colorScheme == .dark ? Color(nsColor: NSColor(white: 0.07, alpha: 1)) : Color(nsColor: .windowBackgroundColor)
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -194,20 +197,28 @@ private struct EditorView: View {
             )
 
             HStack(spacing: 0) {
-                // .leading (not .topLeading) so the tool rail centers
-                // vertically across the full pane height below the title
-                // bar, rather than pinning to the top-left corner (issue #29).
-                ZStack(alignment: .leading) {
-                    VStack(spacing: 0) {
-                        canvasArea
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 0) {
+                    // ToolRail centers vertically on canvasArea's own frame
+                    // (not the filmstrip/toolbar below it) — issue #29.
+                    canvasArea
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay(renameDismissCatcher)
+                        .overlay(alignment: .leading) {
+                            ToolRail(
+                                activeTool: $store.activeTool,
+                                onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
+                                onAddSpread: { store.addSpread(after: store.selectedPageID) }
+                            )
+                            .padding(.leading, 16)
+                        }
 
-                        // Reserves whitespace between the canvas and the
-                        // tool control bar for the floating filmstrip, so
-                        // the canvas never grows into it and the card never
-                        // sits over page content. Equal top/bottom padding
-                        // keeps the gap above and below the filmstrip
-                        // visually even.
+                    // Reserves whitespace between the canvas and the
+                    // tool control bar for the floating filmstrip, so
+                    // the canvas never grows into it and the card never
+                    // sits over page content. Equal top/bottom padding
+                    // keeps the gap above and below the filmstrip
+                    // visually even.
+                    VStack(spacing: 0) {
                         PageFilmstripView(
                             onPrev: { store.goToPreviousUnit() },
                             onNext: { store.goToNextUnit() }
@@ -219,27 +230,7 @@ private struct EditorView: View {
                         ToolControlBar()
                             .padding(.bottom, 24)
                     }
-                    // While a layer name is being renamed in the
-                    // Properties panel, a click anywhere in here (canvas,
-                    // filmstrip thumbnails, tool control bar) should just
-                    // end the rename — not also select an element, flip a
-                    // page, or change a tool control — mirroring the
-                    // canvas's own click-outside-to-commit catcher for
-                    // in-place text editing (PageCanvasView).
-                    .overlay {
-                        if store.renamingLayerID != nil {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture { store.commitRenamingLayer() }
-                        }
-                    }
-
-                    ToolRail(
-                        activeTool: $store.activeTool,
-                        onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
-                        onAddSpread: { store.addSpread(after: store.selectedPageID) }
-                    )
-                    .padding(.leading, 16)
+                    .overlay(renameDismissCatcher)
                 }
                 .overlay(selectionShortcuts)
 
@@ -255,7 +246,7 @@ private struct EditorView: View {
             }
         }
         .environmentObject(store)
-        .background(editorBackground)
+        .background(Color.editorPaneBackground(for: colorScheme))
         .focusedSceneValue(\.arrangeActions, ArrangeActions(
             hasSelection: store.selectedPageID != nil && !store.selectedElementIDs.isEmpty,
             bringToFront: {
@@ -469,6 +460,21 @@ private struct EditorView: View {
         switch store.lastNavigationKind {
         case .crossfade: return .pageCrossfade
         case .flip(let direction): return .pageNavigation(direction: direction, reduceMotion: reduceMotion)
+        }
+    }
+
+    // While a layer name is being renamed in the Properties panel, a click
+    // anywhere in the canvas/filmstrip/tool-control-bar region should just
+    // end the rename — not also select an element, flip a page, or change a
+    // tool control — mirroring the canvas's own click-outside-to-commit
+    // catcher for in-place text editing (PageCanvasView). ToolRail is
+    // deliberately not covered: it's added as a topmost overlay above this.
+    @ViewBuilder
+    private var renameDismissCatcher: some View {
+        if store.renamingLayerID != nil {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { store.commitRenamingLayer() }
         }
     }
 
