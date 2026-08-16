@@ -8,8 +8,6 @@ struct PageFilmstripView: View {
     var onPrev: () -> Void
     var onNext: () -> Void
 
-    @State private var pendingDeletion: PageUnit?
-
     var body: some View {
         let units = store.units
         let currentIndex = store.currentUnitIndex
@@ -52,19 +50,19 @@ struct PageFilmstripView: View {
         .frame(height: 80)
         .background(.bar)
         .confirmationDialog(
-            deletionTitle(for: pendingDeletion),
-            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            deletionTitle(for: store.pendingPageUnitDeletion),
+            isPresented: Binding(get: { store.pendingPageUnitDeletion != nil }, set: { if !$0 { store.pendingPageUnitDeletion = nil } }),
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
-                if let unit = pendingDeletion {
+                if let unit = store.pendingPageUnitDeletion {
                     store.deleteUnit(unit)
                 }
-                pendingDeletion = nil
+                store.pendingPageUnitDeletion = nil
             }
-            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+            Button("Cancel", role: .cancel) { store.pendingPageUnitDeletion = nil }
         } message: {
-            Text(deletionMessage(for: pendingDeletion))
+            Text(deletionMessage(for: store.pendingPageUnitDeletion))
         }
     }
 
@@ -114,7 +112,7 @@ struct PageFilmstripView: View {
             }
         }
         Button("Delete...", role: .destructive) {
-            pendingDeletion = unit
+            store.pendingPageUnitDeletion = unit
         }
     }
 

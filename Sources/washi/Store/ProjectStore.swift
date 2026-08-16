@@ -30,6 +30,10 @@ final class ProjectStore: ObservableObject {
     }
     @Published var activeTool: Tool = .select
     @Published var filmstripMultiSelection: Set<UUID> = []
+    /// Set to show the filmstrip's delete confirmation dialog, either from
+    /// the thumbnail's right-click menu or the global Forward Delete
+    /// shortcut (`washiApp.swift`'s `selectionShortcuts`).
+    @Published var pendingPageUnitDeletion: PageUnit?
     @Published var lastNavigationKind: NavigationKind = .crossfade
     @Published var selectedElementIDs: Set<UUID> = []
     @Published var activeAlignmentGuides: AlignmentGuides = .none
