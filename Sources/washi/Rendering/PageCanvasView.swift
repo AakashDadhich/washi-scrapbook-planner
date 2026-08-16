@@ -285,7 +285,7 @@ struct PageCanvasView: View {
             let cmPoint = CGPoint(x: locationPt.x / scale, y: locationPt.y / scale)
             switch store.activeTool {
             case .addText:
-                store.placeDefaultText(onPageID: page.id, atCm: cmPoint)
+                store.placeDefaultTextAndBeginEditing(onPageID: page.id, atCm: cmPoint)
             case .addBorderFrame:
                 store.placeDefaultFrame(onPageID: page.id, atCm: cmPoint)
             default:
