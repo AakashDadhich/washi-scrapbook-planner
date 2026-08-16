@@ -20,7 +20,7 @@ struct BorderStylePicker: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Thickness").font(.caption2).foregroundStyle(.secondary)
-                    Slider(value: $border.thickness, in: 0.5...10)
+                    Slider(value: $border.thickness, in: 0...10)
                 }
                 .frame(width: 110)
 
