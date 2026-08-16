@@ -172,8 +172,8 @@ extension ProjectStore {
             if handle.handleUnit.y != 0, originalHandlePoint.y != anchorPoint.y {
                 sy = max((newHandlePoint.y - anchorPoint.y) / (originalHandlePoint.y - anchorPoint.y), 0.05)
             }
-            if proportional {
-                let s = handle.isCorner ? (abs(sx) + abs(sy)) / 2 : max(abs(sx), abs(sy))
+            if proportional, handle.isCorner {
+                let s = (abs(sx) + abs(sy)) / 2
                 sx = handle.handleUnit.x != 0 ? s : 1
                 sy = handle.handleUnit.y != 0 ? s : 1
             }
