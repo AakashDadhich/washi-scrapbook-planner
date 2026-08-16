@@ -10,12 +10,12 @@ struct ToolControlBar: View {
         GeometryReader { geo in
             ScrollView(.horizontal, showsIndicators: false) {
                 content
+                    .padding(.horizontal, 16)
                     .frame(minWidth: geo.size.width, alignment: .center)
             }
         }
-        .frame(height: 76)
+        .frame(height: 108)
         .frame(maxWidth: .infinity)
-        .background(.bar)
     }
 
     @ViewBuilder

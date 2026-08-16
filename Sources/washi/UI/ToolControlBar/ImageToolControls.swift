@@ -11,31 +11,38 @@ struct ImageToolControls: View {
     var isEnabled: Bool
 
     var body: some View {
-        HStack(spacing: 16) {
-            Button("Reset Crop") { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
+        HStack(spacing: 14) {
+            ControlGroupBox(label: "Crop") {
+                IconActionButton(icon: "crop", label: "Reset") {
+                    cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+                }
+            }
 
-            Divider().frame(height: 32)
+            ControlGroupBox(label: "Border") {
+                IconToggleButton(
+                    icon: "square.dashed",
+                    label: "Border",
+                    isOn: Binding(get: { border != nil }, set: { border = $0 ? (border ?? .defaultStyle) : nil })
+                )
+                BorderStylePicker(border: Binding(
+                    get: { border ?? .defaultStyle },
+                    set: { border = $0 }
+                ))
+            }
 
-            BorderStylePicker(border: Binding(
-                get: { border ?? .defaultStyle },
-                set: { border = $0 }
-            ))
-            Toggle("Border", isOn: Binding(get: { border != nil }, set: { border = $0 ? (border ?? .defaultStyle) : nil }))
-                .toggleStyle(.checkbox)
-
-            Divider().frame(height: 32)
-
-            Toggle("Transparent background", isOn: $isTransparent)
-                .toggleStyle(.checkbox)
-
-            Toggle("Shadow", isOn: Binding(
-                get: { shadow != nil },
-                set: { shadow = $0 ? (shadow ?? .defaultStyle) : nil }
-            ))
-            .toggleStyle(.checkbox)
+            ControlGroupBox(label: "Appearance") {
+                IconToggleButton(icon: "checkerboard.rectangle", label: "Transparent", isOn: $isTransparent)
+                IconToggleButton(
+                    icon: "square.fill.on.square.fill",
+                    label: "Shadow",
+                    isOn: Binding(
+                        get: { shadow != nil },
+                        set: { shadow = $0 ? (shadow ?? .defaultStyle) : nil }
+                    )
+                )
+            }
         }
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
-        .padding(.horizontal, 16)
     }
 }

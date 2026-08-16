@@ -11,25 +11,25 @@ struct BorderStylePicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 ForEach(BorderStyle.shapeGalleryDefaults.indices, id: \.self) { i in
                     shapeThumbnail(BorderStyle.shapeGalleryDefaults[i].shape)
                 }
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Thickness").font(.caption2).foregroundStyle(.secondary)
                     Slider(value: $border.thickness, in: 0...10)
                 }
-                .frame(width: 110)
+                .frame(width: 92)
 
                 if let amplitudeBinding = amplitudeBinding {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Amplitude").font(.caption2).foregroundStyle(.secondary)
                         Slider(value: amplitudeBinding, in: 1...20)
                     }
-                    .frame(width: 110)
+                    .frame(width: 92)
                 }
 
                 if let wavelengthBinding = wavelengthBinding {
@@ -37,7 +37,7 @@ struct BorderStylePicker: View {
                         Text("Wavelength").font(.caption2).foregroundStyle(.secondary)
                         Slider(value: wavelengthBinding, in: 4...40)
                     }
-                    .frame(width: 110)
+                    .frame(width: 92)
                 }
 
                 ColorSwatchWithHex(color: Binding(
@@ -55,7 +55,7 @@ struct BorderStylePicker: View {
             thumbnailStroke(shape)
                 .padding(4)
         }
-        .frame(width: 30, height: 24)
+        .frame(width: 32, height: 26)
         .clipped()
         .contentShape(Rectangle())
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: isSelected ? 2 : 1))

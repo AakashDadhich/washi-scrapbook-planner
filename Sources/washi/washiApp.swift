@@ -195,19 +195,19 @@ private struct EditorView: View {
                         // Reserves whitespace between the canvas and the
                         // tool control bar for the floating filmstrip, so
                         // the canvas never grows into it and the card never
-                        // sits over page content. Pinned to the top of the
-                        // strip (close to the canvas, as before) with more
-                        // room left below it than above, so it doesn't
-                        // crowd the tool control bar.
+                        // sits over page content. Equal top/bottom padding
+                        // keeps the gap above and below the filmstrip
+                        // visually even.
                         PageFilmstripView(
                             onPrev: { store.goToPreviousUnit() },
                             onNext: { store.goToNextUnit() }
                         )
                         .frame(maxWidth: .infinity, alignment: .top)
-                        .padding(.top, 8)
-                        .padding(.bottom, 32)
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
 
                         ToolControlBar()
+                            .padding(.bottom, 24)
                     }
                     // While a layer name is being renamed in the
                     // Properties panel, a click anywhere in here (canvas,
@@ -469,12 +469,18 @@ private struct EditorView: View {
             ZStack {
                 if let unit = store.currentUnit {
                     PageUnitView(unit: unit)
-                        .frame(maxWidth: geo.size.width * 0.82, maxHeight: geo.size.height * 0.88)
+                        .frame(maxWidth: geo.size.width * 0.82, maxHeight: geo.size.height * 0.95)
                         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
                         .id(unit.id)
                         .transition(currentTransition)
                         .onDrop(of: [.fileURL], isTargeted: nil, perform: handleCanvasDrop)
                         .onDrop(of: [.text], isTargeted: nil, perform: handleClipartDrop)
+                        // Bottom-anchored so the small remaining slack from
+                        // the 0.95 height cap collects above the page
+                        // (already comfortable) rather than splitting into
+                        // the gap above the filmstrip, which should stay
+                        // exactly the filmstrip's own top padding.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 } else {
                     emptyAlbumState
                 }
