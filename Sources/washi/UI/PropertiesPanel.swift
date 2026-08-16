@@ -14,6 +14,13 @@ struct PropertiesPanel: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     transformSection
+                        .overlay {
+                            if store.renamingLayerID != nil {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { store.commitRenamingLayer() }
+                            }
+                        }
                     Divider()
                     layersSection
                 }
@@ -115,6 +122,7 @@ struct PropertiesPanel: View {
     private func layerRow(_ element: PageElement, index: Int, pageID: UUID) -> some View {
         let isSelected = store.selectedElementIDs.contains(element.id)
         let isOffPage = isFullyOffPage(element, pageID: pageID)
+        let isRenamingElsewhere = store.renamingLayerID != nil && store.renamingLayerID != element.id
 
         return HStack(spacing: 6) {
             Image(systemName: element.isVisible ? "eye" : "eye.slash")
@@ -138,20 +146,68 @@ struct PropertiesPanel: View {
                     .help("This element is fully off the page")
             }
 
-            Text(store.elementDisplayName(element))
-                .font(.caption)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    store.selectElement(element.id, onPageID: pageID, extend: false)
-                }
+            layerNameField(element, pageID: pageID)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
         .onDrag { NSItemProvider(object: element.id.uuidString as NSString) }
         .onDrop(of: [.text], delegate: LayerDropDelegate(destinationIndex: index, pageID: pageID, store: store))
+        // While a *different* row is being renamed, this row's own
+        // controls (eye/lock/select) must not fire — a stray click here
+        // should just end that rename, exactly like the canvas's
+        // click-outside-to-commit catcher in PageCanvasView.
+        .overlay {
+            if isRenamingElsewhere {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { store.commitRenamingLayer() }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func layerNameField(_ element: PageElement, pageID: UUID) -> some View {
+        let fieldKey = "layerName-\(element.id.uuidString)"
+        if store.renamingLayerID == element.id {
+            TextField("", text: $store.renamingLayerText)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .focused($focusedField, equals: fieldKey)
+                .onSubmit {
+                    commitRename()
+                }
+                .onExitCommand {
+                    store.cancelRenamingLayer()
+                    focusedField = nil
+                }
+                .onChange(of: focusedField) { _, newValue in
+                    if store.renamingLayerID == element.id && newValue != fieldKey {
+                        commitRename()
+                    }
+                }
+                .onAppear { focusedField = fieldKey }
+        } else {
+            let doubleTap = TapGesture(count: 2).onEnded { store.beginRenamingLayer(element.id, onPageID: pageID) }
+            let singleTap = TapGesture(count: 1).onEnded {
+                store.selectElement(element.id, onPageID: pageID, extend: false)
+            }
+            Text(store.elementDisplayName(element))
+                .font(.caption)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .gesture(doubleTap.exclusively(before: singleTap))
+        }
+    }
+
+    private func commitRename() {
+        store.commitRenamingLayer()
+        focusedField = nil
+        // Matches the numberRow pattern: drop first responder so a
+        // trailing Cmd+Z reaches the app-level undo shortcut instead of
+        // the field editor's own empty undo manager.
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     private func isFullyOffPage(_ element: PageElement, pageID: UUID) -> Bool {

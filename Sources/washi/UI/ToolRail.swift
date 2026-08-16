@@ -39,10 +39,11 @@ struct ToolRail: View {
         .keyboardShortcut(Tool.addPage.shortcutKey, modifiers: [])
         // A disabled control's keyboard shortcut isn't intercepted at all
         // (the key event falls through to whatever's focused instead), so
-        // typing digits 1-7 into a text element being edited doesn't get
-        // eaten as a tool-switch shortcut — see the identical guard on
-        // ProjectStore.editingTextElementID in washiApp.swift/PageFilmstripView.
-        .disabled(store.editingTextElementID != nil)
+        // typing digits 1-7 into a text element (or a layer name) being
+        // edited doesn't get eaten as a tool-switch shortcut — see the
+        // identical guard on ProjectStore.isEditingText in
+        // washiApp.swift/PageFilmstripView.
+        .disabled(store.isEditingText)
     }
 
     private func toolButton(_ tool: Tool) -> some View {
@@ -58,7 +59,7 @@ struct ToolRail: View {
         .background(isActive ? Color.accentColor.opacity(0.25) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         .help(tool.label)
         .keyboardShortcut(tool.shortcutKey, modifiers: [])
-        .disabled(store.editingTextElementID != nil)
+        .disabled(store.isEditingText)
         .modifier(ClipartPopoverIfSticker(tool: tool, activeTool: $activeTool))
     }
 }

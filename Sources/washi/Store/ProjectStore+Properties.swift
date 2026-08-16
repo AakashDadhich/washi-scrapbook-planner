@@ -123,6 +123,9 @@ extension ProjectStore {
     }
 
     func elementDisplayName(_ element: PageElement) -> String {
+        if let customName = element.customName?.trimmingCharacters(in: .whitespacesAndNewlines), !customName.isEmpty {
+            return customName
+        }
         switch element.content {
         case .text(let text):
             let trimmed = text.string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,5 +137,46 @@ extension ProjectStore {
         case .frame:
             return "Frame"
         }
+    }
+
+    /// Sets a custom layer name, or clears it (falling back to the
+    /// auto-generated name) when `name` is empty/whitespace-only.
+    func renameLayer(_ id: UUID, to name: String, onPageID pageID: UUID) {
+        guard let idx = elementIndex(id, onPageID: pageID), let pIdx = pageIndex(for: pageID) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        withUndoCheckpoint {
+            project.album.pages[pIdx].elements[idx].customName = trimmed.isEmpty ? nil : trimmed
+        }
+        markDirty()
+    }
+
+    /// Enters rename mode for `id`'s layer row. Mirrors
+    /// `beginTextEditing`: switching to a different row auto-commits
+    /// whatever was being renamed first, rather than requiring a separate
+    /// confirm step.
+    func beginRenamingLayer(_ id: UUID, onPageID pageID: UUID) {
+        guard renamingLayerID != id else { return }
+        if renamingLayerID != nil {
+            commitRenamingLayer()
+        }
+        guard let element = page(for: pageID)?.elements.first(where: { $0.id == id }) else { return }
+        renamingLayerText = element.customName ?? elementDisplayName(element)
+        renamingLayerID = id
+        renamingLayerPageID = pageID
+    }
+
+    /// Commits whatever's currently typed as the layer's custom name and
+    /// exits rename mode. Safe to call when nothing is being renamed.
+    func commitRenamingLayer() {
+        guard let id = renamingLayerID, let pageID = renamingLayerPageID else { return }
+        renameLayer(id, to: renamingLayerText, onPageID: pageID)
+        renamingLayerID = nil
+        renamingLayerPageID = nil
+    }
+
+    /// Exits rename mode without applying `renamingLayerText` (Escape).
+    func cancelRenamingLayer() {
+        renamingLayerID = nil
+        renamingLayerPageID = nil
     }
 }
