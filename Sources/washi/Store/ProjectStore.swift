@@ -65,7 +65,7 @@ final class ProjectStore: ObservableObject {
     /// placed sticker invisible against a white page until the user
     /// manually opts into a tint.
     @Published var pendingStickerTint: ColorValue? = ColorValue(hex: "#E38FB0")
-    @Published var pendingFrameBorder: BorderStyle = .defaultStyle
+    @Published var pendingFrameBorder: BorderStyle = .defaultFrameStyle
     @Published var pendingFrameFill: ColorValue?
     /// The color last auto-applied to `pendingTextStyle`/`pendingFrameBorder`
     /// by `syncPendingDefaultColors()`, so a background-driven resync never

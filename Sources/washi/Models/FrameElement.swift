@@ -13,6 +13,6 @@ struct FrameElement: Codable, Equatable {
 
 extension FrameElement {
     static func makeDefault() -> FrameElement {
-        FrameElement(shape: .rectangle, border: .defaultStyle, fill: nil)
+        FrameElement(shape: .rectangle, border: .defaultFrameStyle, fill: nil)
     }
 }
