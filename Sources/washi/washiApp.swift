@@ -172,8 +172,15 @@ private struct EditorView: View {
     var onNew: () -> Void
     var onInfo: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showExportSheet = false
     @State private var saveErrorMessage: String?
+
+    // Dark mode gets a darker, near-black pane instead of the standard
+    // system window background (issue #29); light mode is unchanged.
+    private var editorBackground: Color {
+        colorScheme == .dark ? Color(nsColor: NSColor(white: 0.07, alpha: 1)) : Color(nsColor: .windowBackgroundColor)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -187,7 +194,10 @@ private struct EditorView: View {
             )
 
             HStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
+                // .leading (not .topLeading) so the tool rail centers
+                // vertically across the full pane height below the title
+                // bar, rather than pinning to the top-left corner (issue #29).
+                ZStack(alignment: .leading) {
                     VStack(spacing: 0) {
                         canvasArea
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -230,7 +240,6 @@ private struct EditorView: View {
                         onAddSpread: { store.addSpread(after: store.selectedPageID) }
                     )
                     .padding(.leading, 16)
-                    .padding(.top, 16)
                 }
                 .overlay(selectionShortcuts)
 
@@ -246,7 +255,7 @@ private struct EditorView: View {
             }
         }
         .environmentObject(store)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(editorBackground)
         .focusedSceneValue(\.arrangeActions, ArrangeActions(
             hasSelection: store.selectedPageID != nil && !store.selectedElementIDs.isEmpty,
             bringToFront: {
