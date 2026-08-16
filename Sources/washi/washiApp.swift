@@ -188,6 +188,20 @@ private struct EditorView: View {
 
                         ToolControlBar()
                     }
+                    // While a layer name is being renamed in the
+                    // Properties panel, a click anywhere in here (canvas,
+                    // filmstrip thumbnails, tool control bar) should just
+                    // end the rename — not also select an element, flip a
+                    // page, or change a tool control — mirroring the
+                    // canvas's own click-outside-to-commit catcher for
+                    // in-place text editing (PageCanvasView).
+                    .overlay {
+                        if store.renamingLayerID != nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { store.commitRenamingLayer() }
+                        }
+                    }
 
                     ToolRail(
                         activeTool: $store.activeTool,

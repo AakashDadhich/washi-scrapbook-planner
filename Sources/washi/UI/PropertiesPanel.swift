@@ -8,14 +8,19 @@ import AppKit
 struct PropertiesPanel: View {
     @EnvironmentObject var store: ProjectStore
     @FocusState private var focusedField: String?
-    @State private var renamingElementID: UUID?
-    @State private var renameText: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     transformSection
+                        .overlay {
+                            if store.renamingLayerID != nil {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { store.commitRenamingLayer() }
+                            }
+                        }
                     Divider()
                     layersSection
                 }
@@ -117,6 +122,7 @@ struct PropertiesPanel: View {
     private func layerRow(_ element: PageElement, index: Int, pageID: UUID) -> some View {
         let isSelected = store.selectedElementIDs.contains(element.id)
         let isOffPage = isFullyOffPage(element, pageID: pageID)
+        let isRenamingElsewhere = store.renamingLayerID != nil && store.renamingLayerID != element.id
 
         return HStack(spacing: 6) {
             Image(systemName: element.isVisible ? "eye" : "eye.slash")
@@ -147,32 +153,42 @@ struct PropertiesPanel: View {
         .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
         .onDrag { NSItemProvider(object: element.id.uuidString as NSString) }
         .onDrop(of: [.text], delegate: LayerDropDelegate(destinationIndex: index, pageID: pageID, store: store))
+        // While a *different* row is being renamed, this row's own
+        // controls (eye/lock/select) must not fire — a stray click here
+        // should just end that rename, exactly like the canvas's
+        // click-outside-to-commit catcher in PageCanvasView.
+        .overlay {
+            if isRenamingElsewhere {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { store.commitRenamingLayer() }
+            }
+        }
     }
 
     @ViewBuilder
     private func layerNameField(_ element: PageElement, pageID: UUID) -> some View {
         let fieldKey = "layerName-\(element.id.uuidString)"
-        if renamingElementID == element.id {
-            TextField("", text: $renameText)
+        if store.renamingLayerID == element.id {
+            TextField("", text: $store.renamingLayerText)
                 .textFieldStyle(.plain)
                 .font(.caption)
                 .focused($focusedField, equals: fieldKey)
                 .onSubmit {
-                    commitRename(element.id, pageID: pageID)
+                    commitRename()
                 }
                 .onExitCommand {
-                    renamingElementID = nil
+                    store.cancelRenamingLayer()
                     focusedField = nil
-                    store.isRenamingLayer = false
                 }
                 .onChange(of: focusedField) { _, newValue in
-                    if renamingElementID == element.id && newValue != fieldKey {
-                        commitRename(element.id, pageID: pageID)
+                    if store.renamingLayerID == element.id && newValue != fieldKey {
+                        commitRename()
                     }
                 }
                 .onAppear { focusedField = fieldKey }
         } else {
-            let doubleTap = TapGesture(count: 2).onEnded { beginRename(element) }
+            let doubleTap = TapGesture(count: 2).onEnded { store.beginRenamingLayer(element.id, onPageID: pageID) }
             let singleTap = TapGesture(count: 1).onEnded {
                 store.selectElement(element.id, onPageID: pageID, extend: false)
             }
@@ -185,17 +201,9 @@ struct PropertiesPanel: View {
         }
     }
 
-    private func beginRename(_ element: PageElement) {
-        renameText = element.customName ?? store.elementDisplayName(element)
-        renamingElementID = element.id
-        store.isRenamingLayer = true
-    }
-
-    private func commitRename(_ id: UUID, pageID: UUID) {
-        store.renameLayer(id, to: renameText, onPageID: pageID)
-        renamingElementID = nil
+    private func commitRename() {
+        store.commitRenamingLayer()
         focusedField = nil
-        store.isRenamingLayer = false
         // Matches the numberRow pattern: drop first responder so a
         // trailing Cmd+Z reaches the app-level undo shortcut instead of
         // the field editor's own empty undo manager.
