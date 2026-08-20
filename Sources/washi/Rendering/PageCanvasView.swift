@@ -164,31 +164,23 @@ struct PageCanvasView: View {
         interactionOriginGlobal = originGlobal
         let locationPt = CGPoint(x: globalPoint.x - originGlobal.x, y: globalPoint.y - originGlobal.y)
 
-        if store.selectedPageID == page.id, !store.selectedElementIDs.isEmpty, !selectionIsLocked,
-           let bounds = selectionBoundsPt(scale: scale) {
-            let centerPt = CGPoint(x: bounds.midX, y: bounds.midY)
-            let rotation = selectionRotationDegrees
-
-            let rotationHandlePt = rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: 0, height: -bounds.height / 2 - 22))
-            if distance(locationPt, rotationHandlePt) < handleHitRadius {
+        if let handles = selectionHandlePoints(scale: scale) {
+            if distance(locationPt, handles.rotation) < handleHitRadius {
                 interaction = .rotate
                 store.beginGestureSnapshot()
                 rotateStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
                 let cmBounds = store.combinedUnrotatedBounds(store.selectedElementIDs, onPageID: page.id) ?? .zero
                 rotateCenterCm = CGPoint(x: cmBounds.midX, y: cmBounds.midY)
-                rotateStartAngle = TransformMath.angleDegrees(center: centerPt, point: locationPt)
+                rotateStartAngle = TransformMath.angleDegrees(center: handles.center, point: locationPt)
                 return
             }
 
-            for h in HandlePosition.allCases {
-                let hp = rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: h.handleUnit.x * bounds.width, height: h.handleUnit.y * bounds.height))
-                if distance(locationPt, hp) < handleHitRadius {
-                    interaction = .resize(h)
-                    store.beginGestureSnapshot()
-                    resizeStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
-                    resizeStartBounds = store.combinedUnrotatedBounds(store.selectedElementIDs, onPageID: page.id) ?? .zero
-                    return
-                }
+            for (h, hp) in handles.resize where distance(locationPt, hp) < handleHitRadius {
+                interaction = .resize(h)
+                store.beginGestureSnapshot()
+                resizeStartTransforms = store.currentTransformSnapshot(forSelectionOnPageID: page.id)
+                resizeStartBounds = store.combinedUnrotatedBounds(store.selectedElementIDs, onPageID: page.id) ?? .zero
+                return
             }
         }
 
@@ -299,19 +291,33 @@ struct PageCanvasView: View {
     }
 
     /// The gesture's hit-testable region: the page rect, plus the own
-    /// (unrotated) bounding box of any element that's fully off-page. The
-    /// page itself doesn't clip its content, so an off-page element can
-    /// still be visible in the unused margin around it — this lets the
-    /// user click and drag it straight back rather than only being able to
-    /// reselect it indirectly via the Layers list (issue #13). Kept
-    /// element-shaped rather than a blanket margin expansion so it doesn't
-    /// swallow clicks meant for floating chrome like the tool rail.
+    /// (unrotated) bounding box of any element that's fully off-page, plus
+    /// the hit disc of every currently-drawn selection handle. The page
+    /// itself doesn't clip its content, so an off-page element can still be
+    /// visible in the unused margin around it — this lets the user click
+    /// and drag it straight back rather than only being able to reselect it
+    /// indirectly via the Layers list (issue #13). Handles get the same
+    /// treatment for the same reason: an element sitting near or across a
+    /// page edge (routine now that elements can straddle a spread's gutter)
+    /// pushes handles past the page rect, where they were drawn but not
+    /// clickable because the shape stopped at the edge (issue #37). Kept
+    /// element- and handle-shaped rather than a blanket margin expansion so
+    /// it doesn't swallow clicks meant for floating chrome like the tool
+    /// rail.
     private func interactiveShape(scale: CGFloat, pageSizePt: CGSize) -> Path {
         var path = Path(CGRect(origin: .zero, size: pageSizePt))
         guard isInteractive else { return path }
         for element in page.elements where element.isVisible && page.isElementFullyOffPage(element) {
             let r = element.transform.unrotatedRect
             path.addRect(CGRect(x: r.minX * scale, y: r.minY * scale, width: r.width * scale, height: r.height * scale))
+        }
+        if store.editingTextElementID == nil, let handles = selectionHandlePoints(scale: scale) {
+            for point in [handles.rotation] + handles.resize.map(\.point) {
+                path.addRect(CGRect(
+                    x: point.x - handleHitRadius, y: point.y - handleHitRadius,
+                    width: handleHitRadius * 2, height: handleHitRadius * 2
+                ))
+            }
         }
         return path
     }
@@ -327,6 +333,25 @@ struct PageCanvasView: View {
             }
         }
         return nil
+    }
+
+    /// Where this page's selection handles are drawn, in page point space,
+    /// or `nil` when no draggable selection is on this page. Single source
+    /// of truth for both the gesture's handle hit-testing and the region
+    /// `interactiveShape` has to make hit-testable, so the two can't drift
+    /// apart and leave a drawn handle unclickable again.
+    private func selectionHandlePoints(scale: CGFloat) -> (center: CGPoint, rotation: CGPoint, resize: [(handle: HandlePosition, point: CGPoint)])? {
+        guard store.selectedPageID == page.id, !store.selectedElementIDs.isEmpty, !selectionIsLocked,
+              let bounds = selectionBoundsPt(scale: scale) else { return nil }
+        let centerPt = CGPoint(x: bounds.midX, y: bounds.midY)
+        let rotation = selectionRotationDegrees
+        return (
+            center: centerPt,
+            rotation: rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: 0, height: -bounds.height / 2 - SelectionHandlesView.rotationHandleGap)),
+            resize: HandlePosition.allCases.map { h in
+                (h, rotatedPagePoint(center: centerPt, rotationDegrees: rotation, localOffset: CGSize(width: h.handleUnit.x * bounds.width, height: h.handleUnit.y * bounds.height)))
+            }
+        )
     }
 
     private func rotatedPagePoint(center: CGPoint, rotationDegrees: Double, localOffset: CGSize) -> CGPoint {

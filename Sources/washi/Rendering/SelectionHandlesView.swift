@@ -17,7 +17,10 @@ struct SelectionHandlesView: View {
     var isLocked: Bool
 
     private let handleDiameter: CGFloat = 9
-    private let rotationHandleGap: CGFloat = 22
+    /// Gap between the top of the selection box and the rotation handle.
+    /// `PageCanvasView` hit-tests and builds its clickable region from this
+    /// same value, so it lives here next to the drawing that defines it.
+    static let rotationHandleGap: CGFloat = 22
 
     var body: some View {
         ZStack {
@@ -54,6 +57,6 @@ struct SelectionHandlesView: View {
             .fill(Color.white)
             .overlay(Circle().stroke(Color.accentColor, lineWidth: 1.5))
             .frame(width: handleDiameter + 2, height: handleDiameter + 2)
-            .position(x: sizePt.width / 2, y: -rotationHandleGap)
+            .position(x: sizePt.width / 2, y: -Self.rotationHandleGap)
     }
 }
