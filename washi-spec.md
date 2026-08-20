@@ -339,14 +339,13 @@ This section describes the window's fixed chrome, matching the wireframe you pro
 A vertical floating rail, top to bottom, one tool active at a time (radio-button behavior, not multi-toggle):
 
 1. **Select/Move** - default tool; click and drag elements directly on canvas, marquee-select on empty space (§6.1-6.2)
-2. **Add Page** - inserts a page or spread after the current one (§9); does not persist as an "active" placement tool afterward, it's a one-shot action
-3. **Add Text** - places a new `TextElement` where you next click/drag on the canvas
-4. **Add Image** - opens a file picker (or accepts a drag-and-drop) and places a new `ImageElement`
-5. **Add Sticker/Washi Tape** - opens the Clipart panel (§7) to pick an asset, then places a new `StickerElement`
-6. **Add Border/Frame** - places a new standalone `FrameElement` (§3.7)
-7. **Background color** - not a placement tool; opens the current page's background color picker directly in the tool control bar (§5.5)
+2. **Add Text** - places a new `TextElement` where you next click/drag on the canvas
+3. **Add Image** - opens a file picker (or accepts a drag-and-drop) and places a new `ImageElement`
+4. **Add Sticker/Washi Tape** - opens the Clipart panel (§7) to pick an asset, then places a new `StickerElement`
+5. **Add Border/Frame** - places a new standalone `FrameElement` (§3.7)
+6. **Background color** - not a placement tool; opens the current page's background color picker directly in the tool control bar (§5.5)
 
-Selecting any placement tool (2-6) immediately populates the tool control bar (§5.5) with that tool's relevant controls **before** you've placed anything - e.g. clicking "Add Text" shows font/size/color/border pickers right away, so you set them up once and then drop text boxes with those settings already applied, rather than placing first and styling after. After placing an element, the tool automatically returns to Select/Move with the new element selected, so you can immediately transform it.
+Selecting any placement tool (2-5) immediately populates the tool control bar (§5.5) with that tool's relevant controls **before** you've placed anything - e.g. clicking "Add Text" shows font/size/color/border pickers right away, so you set them up once and then drop text boxes with those settings already applied, rather than placing first and styling after. After placing an element, the tool automatically returns to Select/Move with the new element selected, so you can immediately transform it.
 
 ### 5.3 Canvas
 Shows one navigable unit at a time: the cover alone, the first page alone, or a spread as two facing pages side by side, per §3.2's `PageRole`. Always rendered at true relative proportions to the page's physical size (§1.1).
@@ -356,7 +355,7 @@ Directly below the canvas: a **left arrow**, a **horizontal filmstrip of page/sp
 
 - **Thumbnails**: each shows a live-updating low-res render of that page/spread (cover, single page, or spread rendered as one wide thumbnail). Clicking a thumbnail jumps the canvas directly to it with a crossfade (not a flip - flipping through every intervening page when jumping from page 2 to page 12 would be tedious rather than useful). Drag-to-reorder within the filmstrip reorders pages in the album.
 - **Left/right arrows** (or `←`/`→`) step exactly one unit at a time - cover → first page → spread 1 → spread 2 → ... - and trigger `PageFlipTransition`: a short (≈400ms) 3D page-curl/turn animation via `CATransform3D`, matching the physical-book metaphor (§1.1). Flip direction matches navigation direction. A "reduce motion" accessibility check falls back to a plain crossfade.
-- A `+` at the end of the filmstrip offers the same "add page or spread" action as the toolbar's Add Page tool (§5.2, §9) - both exist since reaching for a tool on the left vs. a `+` at the end of the strip are both natural places to look for it.
+- A `+` beside the filmstrip - outside the scrolling thumbnail strip, alongside the left/right arrows - offers the "add page or spread" action (§9). It sits outside the scroll area so it stays visible however many pages the album has and wherever the strip is scrolled to; it is the app's only add-page control, apart from the empty-album prompt (§14 edge case 9).
 - **Merge / split**: shift-click two *adjacent* single-page thumbnails to select them together and reveal a "Merge into spread" action (right-click menu or a button that appears above the selected pair); right-click a spread thumbnail for "Split into two pages." Both are the explicit, symmetric conversion described in §3.2 - content on each page is preserved exactly, only the `PageRole` tagging and how the pair is navigated/displayed changes.
 - **Deleting the cover or first page**: no special-cased protection - right-click (or select + Delete) works on the cover and first-page thumbnails exactly like any other, with the same confirmation dialog (§9). If deleted, the album simply opens on whatever page is now first.
 
@@ -427,7 +426,7 @@ Every mutation to `Project` (element add/remove/transform, property edits, page 
 
 ## 9. Adding / removing pages
 
-- The **Add Page** toolbar icon (§5.2) or the filmstrip's trailing `+` (§5.4) or `Page > Add Page...`, offering: add a single page, or add a spread (two pages), inserted after the currently selected page, with the current default background/size pre-filled and editable.
+- The filmstrip's `+` (§5.4), offering: add a single page, or add a spread (two pages), inserted after the currently selected page, with the current default background/size pre-filled and editable.
 - Deleting a page (right-click a filmstrip thumbnail, or Delete key with a thumbnail selected) always shows a confirmation dialog naming the page ("Delete Spread 3? This removes 2 pages and everything on them. This cannot be undone after closing the project.") before removing it. Deletion *within* the current session is still undoable via `Cmd+Z` like any other action; the dialog's warning is about the boundary once the project is saved and closed.
 - The cover and first page use the same deletion flow as any other page - there is no special protection on them (§1.1, §3.2). Deleting the cover shows a confirmation naming it ("Delete Cover? ..."); the album then simply opens on whatever page is now first.
 
@@ -484,7 +483,7 @@ This mirrors the reference spec's principle of keeping the project `Codable`, bu
 | `Cmd+A` | Select all elements on current page/spread |
 | `Cmd+Shift+I` | Import photo |
 | `Cmd+E` | Export PDF |
-| `1`-`7` | Switch left-toolbar tool (Select, Add Page, Add Text, Add Image, Add Sticker, Add Border/Frame, Background) |
+| `1`-`6` | Switch left-toolbar tool (Select, Add Text, Add Image, Add Sticker, Add Border/Frame, Background) |
 | `Cmd+/` | Open Keyboard Shortcuts sheet (same as the Info button) |
 
 ---
@@ -593,7 +592,7 @@ No open questions outstanding.
 | D7 | v1 export is PDF only, at true physical page size, with the renderer parameterized for size/DPI | Matches your confirmed requirement; keeps a later JPG/PNG or per-spread export cheap to add without re-architecting |
 | D8 | Page-flip animation only plays for sequential Next/Previous navigation; filmstrip thumbnail jumps crossfade | A flip through every intervening page when jumping from page 2 to page 40 would be tedious rather than delightful; matches how physical browsing vs. jumping to a bookmark differ |
 | D9 | Autosave writes to a separate recovery snapshot, distinct from the user's last explicit save | Protects against crash/power-loss without silently overwriting the user's intentionally-saved state |
-| D10 | One toolbar icon per element type (Select, Add Page, Add Text, Add Image, Add Sticker, Add Border/Frame, Background), not a single generic "+" menu | Matches your explicit preference after weighing both; keeps the most-reached-for actions one click away instead of one click plus a menu selection |
+| D10 | One toolbar icon per element type (Select, Add Text, Add Image, Add Sticker, Add Border/Frame, Background), not a single generic "+" menu | Matches your explicit preference after weighing both; keeps the most-reached-for actions one click away instead of one click plus a menu selection. Adding a page is not an element placement, so it lives on the filmstrip (§5.4) rather than the rail |
 | D11 | No right-side Inspector; contextual styling controls live in a bottom-center Tool Control Bar, with position/size/rotation and the layer list in a separate right-side Properties panel that only appears when something is selected | Matches your wireframe's bottom-bar layout and your follow-up preference for keeping transform/layers separate; a square canvas also loses less width to a bottom bar than a side panel |
 | D12 | Tool control bar shows a tool's controls the moment that tool is selected, before anything is placed on canvas | Matches your explicit preference - lets you set font/border/color once and place multiple elements with those settings already applied |
 | D13 | Page navigation is a single filmstrip + prev/next below the canvas; the earlier left-sidebar navigator concept is dropped | Matches your wireframe and your explicit confirmation; avoids two competing places to find the same pages |

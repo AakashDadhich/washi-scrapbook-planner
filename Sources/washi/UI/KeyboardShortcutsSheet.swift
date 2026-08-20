@@ -19,7 +19,7 @@ struct KeyboardShortcutsSheet: View {
         ("⌘ + A", "Select all elements on current page/spread"),
         ("⇧ + ⌘ + I", "Import photo"),
         ("⌘ + E", "Export PDF"),
-        ("1–7", "Switch left-toolbar tool (Select, Add Page, Add Text, Add Image, Add Sticker, Add Border/Frame, Background)"),
+        ("1–6", "Switch left-toolbar tool (Select, Add Text, Add Image, Add Sticker, Add Border/Frame, Background)"),
         ("⌘ + /", "Open Keyboard Shortcuts sheet (same as the Info button)")
     ]
 

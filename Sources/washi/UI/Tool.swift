@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// The 7 left-toolbar tools (spec §5.2), radio-button behavior — one active
-/// at a time. `.addPage` is the one exception: it's a one-shot action and
-/// never becomes the persisted `activeTool`.
+/// The 6 left-toolbar tools (spec §5.2), radio-button behavior — one active
+/// at a time. Adding a page or spread is not a tool: it lives on the
+/// filmstrip (§5.4) as a one-shot action.
 enum Tool: Int, CaseIterable, Identifiable {
     case select = 1
-    case addPage
     case addText
     case addImage
     case addSticker
@@ -17,7 +16,6 @@ enum Tool: Int, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .select: return "Select/Move"
-        case .addPage: return "Add Page"
         case .addText: return "Add Text"
         case .addImage: return "Add Image"
         case .addSticker: return "Add Sticker/Washi Tape"
@@ -29,7 +27,6 @@ enum Tool: Int, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .select: return "cursorarrow"
-        case .addPage: return "doc.badge.plus"
         case .addText: return "textformat"
         case .addImage: return "photo"
         case .addSticker: return "star.bubble"
@@ -38,7 +35,7 @@ enum Tool: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// Matches the §12 keyboard shortcut table: `1`-`7` switch tools in this order.
+    /// Matches the §12 keyboard shortcut table: `1`-`6` switch tools in this order.
     var shortcutKey: KeyEquivalent {
         KeyEquivalent(Character("\(rawValue)"))
     }

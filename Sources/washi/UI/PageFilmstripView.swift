@@ -33,16 +33,6 @@ struct PageFilmstripView: View {
                     ForEach(Array(units.enumerated()), id: \.element.id) { index, unit in
                         thumbnail(for: unit, index: index, isCurrent: index == currentIndex, units: units)
                     }
-
-                    Menu {
-                        Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
-                        Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .frame(width: 40, height: 56)
                 }
                 .padding(.horizontal, 8)
                 .animation(.easeOut(duration: 0.12), value: dropInsertionIndex)
@@ -53,6 +43,8 @@ struct PageFilmstripView: View {
             }
             .keyboardShortcut(.rightArrow, modifiers: [])
             .disabled(currentIndex >= units.count - 1 || store.isEditingText)
+
+            addUnitMenu
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)
@@ -76,6 +68,23 @@ struct PageFilmstripView: View {
         } message: {
             Text(deletionMessage(for: store.pendingPageUnitDeletion))
         }
+    }
+
+    /// Sits outside the scrolling strip alongside prev/next, so adding a
+    /// page stays one click away no matter how many pages the strip holds
+    /// or where it's scrolled to (issue #35). This is the app's only
+    /// add-page control apart from the empty-album prompt.
+    private var addUnitMenu: some View {
+        Menu {
+            Button("Add Single Page") { store.addSinglePage(after: store.selectedPageID) }
+            Button("Add Spread") { store.addSpread(after: store.selectedPageID) }
+        } label: {
+            Image(systemName: "plus")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Add Page or Spread")
     }
 
     @ViewBuilder
