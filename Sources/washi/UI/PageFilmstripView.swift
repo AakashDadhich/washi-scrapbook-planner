@@ -12,6 +12,11 @@ struct PageFilmstripView: View {
 
     private let maxCardWidth: CGFloat = 480
 
+    /// Gap the in-flight drag would drop into, in `moveUnit`'s insertion
+    /// indexing (0 = before the first unit, `units.count` = after the last).
+    /// Non-nil only while a filmstrip drag is hovering a thumbnail.
+    @State private var dropInsertionIndex: Int?
+
     var body: some View {
         let units = store.units
         let currentIndex = store.currentUnitIndex
@@ -39,7 +44,8 @@ struct PageFilmstripView: View {
                     .fixedSize()
                     .frame(width: 40, height: 56)
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 8)
+                .animation(.easeOut(duration: 0.12), value: dropInsertionIndex)
             }
 
             Button(action: onNext) {
@@ -95,13 +101,38 @@ struct PageFilmstripView: View {
                     store.selectUnit(at: index)
                 }
             }
+            // The gap *after* a thumbnail is the same gap as the one
+            // before the next thumbnail, so only the last unit draws a
+            // trailing indicator — otherwise every interior gap would be
+            // drawn twice.
+            .overlay(alignment: .leading) {
+                dropIndicator(visible: dropInsertionIndex == index, edge: .leading)
+            }
+            .overlay(alignment: .trailing) {
+                dropIndicator(visible: dropInsertionIndex == units.count && index == units.count - 1, edge: .trailing)
+            }
             .contextMenu {
                 menuItems(for: unit)
             }
             .onDrag {
                 NSItemProvider(object: String(index) as NSString)
             }
-            .onDrop(of: [.text], delegate: FilmstripDropDelegate(destinationIndex: index, store: store))
+            .onDrop(of: [.text], delegate: FilmstripDropDelegate(
+                unitIndex: index,
+                unitWidth: unit.isSpread ? 96 : 48,
+                store: store,
+                insertionIndex: $dropInsertionIndex
+            ))
+    }
+
+    /// Insertion caret shown mid-gap during a drag, centered in the 8pt
+    /// spacing between thumbnails.
+    private func dropIndicator(visible: Bool, edge: HorizontalEdge) -> some View {
+        Capsule()
+            .fill(Color.accentColor)
+            .frame(width: 3)
+            .offset(x: edge == .leading ? -5.5 : 5.5)
+            .opacity(visible ? 1 : 0)
     }
 
     @ViewBuilder
@@ -152,22 +183,40 @@ struct PageFilmstripView: View {
     }
 }
 
-/// Drag-to-reorder within the filmstrip (spec §5.4).
+/// Drag-to-reorder within the filmstrip (spec §5.4). Hovering the leading
+/// half of a thumbnail drops before it, the trailing half drops after it,
+/// which is what `insertionIndex` reports back for the drop indicator.
 private struct FilmstripDropDelegate: DropDelegate {
-    let destinationIndex: Int
+    let unitIndex: Int
+    let unitWidth: CGFloat
     let store: ProjectStore
+    @Binding var insertionIndex: Int?
+
+    private func gap(for info: DropInfo) -> Int {
+        info.location.x < unitWidth / 2 ? unitIndex : unitIndex + 1
+    }
 
     func performDrop(info: DropInfo) -> Bool {
+        let destination = gap(for: info)
+        insertionIndex = nil
         guard let provider = info.itemProviders(for: [.text]).first else { return false }
         provider.loadObject(ofClass: NSString.self) { reading, _ in
             guard let string = reading as? String, let sourceIndex = Int(string) else { return }
             Task { @MainActor in
-                store.moveUnit(fromIndex: sourceIndex, toIndex: destinationIndex)
+                store.moveUnit(fromIndex: sourceIndex, toInsertionIndex: destination)
             }
         }
         return true
     }
 
-    func dropEntered(info: DropInfo) {}
+    func dropEntered(info: DropInfo) { insertionIndex = gap(for: info) }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        insertionIndex = gap(for: info)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) { insertionIndex = nil }
+
     func validateDrop(info: DropInfo) -> Bool { true }
 }
