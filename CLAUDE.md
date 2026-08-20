@@ -21,7 +21,7 @@ For faster iteration without reassembling the bundle:
 swift build -c release   # or drop -c release for a debug build
 ```
 
-There is no test target and no lint config in this repo.
+There is no test target and no lint config in this repo, and adding an ordinary one isn't possible here: `XCTest.framework` ships inside `Xcode.app`, not the Command Line Tools this project builds against, so `swift test` fails at `import XCTest` on a machine set up per the note above. `swift-testing` isn't an escape hatch either, since pulling it in would break the zero-third-party-dependency rule. The only fully runnable alternative would be splitting `Sources/washi` into a library plus a thin executable so a dependency-free test-runner executable could link it, which is a bigger change to the package than any one milestone has warranted. Verify changes by building and driving the app instead, and don't add an XCTest target expecting it to run.
 
 ## Architecture
 
@@ -42,3 +42,9 @@ There is no test target and no lint config in this repo.
 ### Images
 
 `ImageLoader` has two decode paths because `CGImageSourceCreateWithURL` returns an empty source for SVG/PDF on this platform despite `NSImage` handling them fine: every entry point tries the fast `CGImageSource` path first (the common JPEG/PNG case) and falls back to rasterizing via `NSImage`. The canvas and thumbnails always use `downsampledImage(at:maxDimension:)`; only `PDFExporter` uses `fullResolutionImage(at:)`.
+
+### Drag-and-drop
+
+A SwiftUI `Button` swallows drags on macOS: its press gesture consumes the mouse-down before `.onDrag` can start a drag, so `.onDrag` attached to a `Button` silently never fires (no feedback, no drop, no error). Anything draggable must therefore be a plain view with `.contentShape(…)` plus `.onTapGesture` for its click behavior, never a `Button`. Both drag sources in the app do this: filmstrip thumbnails (`PageFilmstripView`) and layer rows (`PropertiesPanel`). This bit the filmstrip's drag-to-reorder, which was dead from M6 until #38.
+
+The two reorder methods index their destinations differently, so check which one you're calling: `moveLayer(elementID:toDisplayIndex:)` takes the moved element's *final* index, while `moveUnit(fromIndex:toInsertionIndex:)` takes an insertion *gap* in `Array.insert(at:)` numbering (gap `k` sits before the unit at index `k`, and `units.count` is the gap after the last unit). The filmstrip needs gaps because its drop indicator distinguishes hovering the leading half of a thumbnail (insert before) from the trailing half (insert after), and because the gap past the last unit is otherwise unreachable.

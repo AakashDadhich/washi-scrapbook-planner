@@ -263,7 +263,9 @@ struct PageCanvasView: View {
     private func endInteraction(value: DragGesture.Value) {
         let scale = interactionScale
         switch interaction {
-        case .move, .resize, .rotate:
+        case .move:
+            store.endMoveInteraction(onPageID: page.id, gutterCm: SpreadView.gutterPt / scale)
+        case .resize, .rotate:
             store.endInteraction()
         case .marquee:
             guard let start = marqueeStart else { return }
