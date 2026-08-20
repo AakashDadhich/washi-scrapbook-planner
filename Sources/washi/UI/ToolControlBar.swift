@@ -39,8 +39,6 @@ struct ToolControlBar: View {
             FrameToolControls(border: $store.pendingFrameBorder, fill: $store.pendingFrameFill, isEnabled: true)
         case .background:
             backgroundContent
-        case .addPage:
-            selectStateContent
         }
     }
 

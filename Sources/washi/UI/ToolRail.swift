@@ -1,49 +1,21 @@
 import SwiftUI
 
-/// Floating left toolbar (spec §5.2): one tool active at a time, except
-/// `.addPage` which fires immediately rather than becoming "active".
+/// Floating left toolbar (spec §5.2): one tool active at a time. Adding a
+/// page or spread isn't here — that lives on the filmstrip (§5.4).
 struct ToolRail: View {
     @EnvironmentObject var store: ProjectStore
     @Binding var activeTool: Tool
-    var onAddSinglePage: () -> Void
-    var onAddSpread: () -> Void
 
     var body: some View {
         VStack(spacing: 4) {
             ForEach(Tool.allCases) { tool in
-                if tool == .addPage {
-                    addPageButton
-                } else {
-                    toolButton(tool)
-                }
+                toolButton(tool)
             }
         }
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(.separator, lineWidth: 0.5))
         .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
-    }
-
-    private var addPageButton: some View {
-        Menu {
-            Button("Add Single Page", action: onAddSinglePage)
-            Button("Add Spread", action: onAddSpread)
-        } label: {
-            Image(systemName: Tool.addPage.systemImage)
-                .font(.system(size: 15, weight: .medium))
-                .frame(width: 34, height: 34)
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help(Tool.addPage.label)
-        .keyboardShortcut(Tool.addPage.shortcutKey, modifiers: [])
-        // A disabled control's keyboard shortcut isn't intercepted at all
-        // (the key event falls through to whatever's focused instead), so
-        // typing digits 1-7 into a text element (or a layer name) being
-        // edited doesn't get eaten as a tool-switch shortcut — see the
-        // identical guard on ProjectStore.isEditingText in
-        // washiApp.swift/PageFilmstripView.
-        .disabled(store.isEditingText)
     }
 
     private func toolButton(_ tool: Tool) -> some View {
@@ -59,6 +31,12 @@ struct ToolRail: View {
         .background(isActive ? Color.accentColor.opacity(0.25) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         .help(tool.label)
         .keyboardShortcut(tool.shortcutKey, modifiers: [])
+        // A disabled control's keyboard shortcut isn't intercepted at all
+        // (the key event falls through to whatever's focused instead), so
+        // typing digits 1-6 into a text element (or a layer name) being
+        // edited doesn't get eaten as a tool-switch shortcut — see the
+        // identical guard on ProjectStore.isEditingText in
+        // washiApp.swift/PageFilmstripView.
         .disabled(store.isEditingText)
         .modifier(ClipartPopoverIfSticker(tool: tool, activeTool: $activeTool))
     }

@@ -204,11 +204,7 @@ private struct EditorView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .overlay(renameDismissCatcher)
                         .overlay(alignment: .leading) {
-                            ToolRail(
-                                activeTool: $store.activeTool,
-                                onAddSinglePage: { store.addSinglePage(after: store.selectedPageID) },
-                                onAddSpread: { store.addSpread(after: store.selectedPageID) }
-                            )
+                            ToolRail(activeTool: $store.activeTool)
                             .padding(.leading, 16)
                         }
 
