@@ -212,12 +212,22 @@ extension ProjectStore {
 
     // MARK: - Reorder (drag-to-reorder in the filmstrip, spec §5.4)
 
-    /// Moves the unit at `sourceIndex` to just before the unit currently at
-    /// `destinationIndex`, keeping each unit's pages (1 or 2) contiguous
-    /// and in order.
-    func moveUnit(fromIndex sourceIndex: Int, toIndex destinationIndex: Int) {
+    /// Moves the unit at `sourceIndex` into the gap `insertionIndex`,
+    /// keeping each unit's pages (1 or 2) contiguous and in order.
+    ///
+    /// Gaps are numbered like `Array.insert(at:)`: gap `k` is the position
+    /// immediately before the unit currently at index `k`, and gap
+    /// `units.count` is the position after the last unit. The filmstrip
+    /// derives the gap from which half of a thumbnail the drag is over, so
+    /// this indexing is what the drop indicator draws.
+    ///
+    /// Both gaps touching the dragged unit (`sourceIndex` and
+    /// `sourceIndex + 1`) describe the position it already occupies, so
+    /// they are no-ops rather than pointless undo checkpoints.
+    func moveUnit(fromIndex sourceIndex: Int, toInsertionIndex insertionIndex: Int) {
         let u = units
-        guard u.indices.contains(sourceIndex), destinationIndex >= 0, destinationIndex <= u.count, sourceIndex != destinationIndex else { return }
+        guard u.indices.contains(sourceIndex), insertionIndex >= 0, insertionIndex <= u.count,
+              insertionIndex != sourceIndex, insertionIndex != sourceIndex + 1 else { return }
 
         var pages = project.album.pages
         let sourceIDs = Set(u[sourceIndex].pageIDs)
@@ -225,10 +235,10 @@ extension ProjectStore {
         pages.removeAll(where: { sourceIDs.contains($0.id) })
 
         let remainingUnits = u.enumerated().filter { $0.offset != sourceIndex }.map { $0.element }
-        let clampedDestination = min(destinationIndex > sourceIndex ? destinationIndex - 1 : destinationIndex, remainingUnits.count)
+        let targetIndex = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
 
         var insertAt = pages.count
-        if clampedDestination < remainingUnits.count, let firstID = remainingUnits[clampedDestination].pageIDs.first {
+        if targetIndex < remainingUnits.count, let firstID = remainingUnits[targetIndex].pageIDs.first {
             insertAt = pages.firstIndex(where: { $0.id == firstID }) ?? pages.count
         }
 
