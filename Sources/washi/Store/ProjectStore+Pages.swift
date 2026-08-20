@@ -212,12 +212,14 @@ extension ProjectStore {
 
     // MARK: - Reorder (drag-to-reorder in the filmstrip, spec §5.4)
 
-    /// Moves the unit at `sourceIndex` to just before the unit currently at
-    /// `destinationIndex`, keeping each unit's pages (1 or 2) contiguous
-    /// and in order.
+    /// Moves the unit at `sourceIndex` so that it ends up at
+    /// `destinationIndex` in the resulting unit order, keeping each unit's
+    /// pages (1 or 2) contiguous and in order. Destination is the moved
+    /// unit's *final* index (same convention as `moveLayer`), so dropping
+    /// onto a thumbnail takes that thumbnail's slot in both directions.
     func moveUnit(fromIndex sourceIndex: Int, toIndex destinationIndex: Int) {
         let u = units
-        guard u.indices.contains(sourceIndex), destinationIndex >= 0, destinationIndex <= u.count, sourceIndex != destinationIndex else { return }
+        guard u.indices.contains(sourceIndex), destinationIndex >= 0, destinationIndex < u.count, sourceIndex != destinationIndex else { return }
 
         var pages = project.album.pages
         let sourceIDs = Set(u[sourceIndex].pageIDs)
@@ -225,10 +227,9 @@ extension ProjectStore {
         pages.removeAll(where: { sourceIDs.contains($0.id) })
 
         let remainingUnits = u.enumerated().filter { $0.offset != sourceIndex }.map { $0.element }
-        let clampedDestination = min(destinationIndex > sourceIndex ? destinationIndex - 1 : destinationIndex, remainingUnits.count)
 
         var insertAt = pages.count
-        if clampedDestination < remainingUnits.count, let firstID = remainingUnits[clampedDestination].pageIDs.first {
+        if destinationIndex < remainingUnits.count, let firstID = remainingUnits[destinationIndex].pageIDs.first {
             insertAt = pages.firstIndex(where: { $0.id == firstID }) ?? pages.count
         }
 

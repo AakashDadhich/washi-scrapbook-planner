@@ -76,30 +76,32 @@ struct PageFilmstripView: View {
     private func thumbnail(for unit: PageUnit, index: Int, isCurrent: Bool, units: [PageUnit]) -> some View {
         let isMultiSelected = unit.pageIDs.contains(where: { store.filmstripMultiSelection.contains($0) })
 
-        Button {
-            if NSEvent.modifierFlags.contains(.shift) {
-                guard case .single = unit else { return }
-                store.toggleFilmstripSelection(unit.pageIDs[0])
-            } else {
-                store.selectUnit(at: index)
+        // Deliberately a tap gesture rather than a Button: on macOS a
+        // Button's press gesture swallows the drag before `.onDrag` can
+        // start one, which silently breaks drag-to-reorder.
+        PageUnitView(unit: unit, isInteractive: false)
+            .frame(width: unit.isSpread ? 96 : 48, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(isMultiSelected ? Color.orange : (isCurrent ? Color.accentColor : Color.secondary.opacity(0.3)), lineWidth: isCurrent || isMultiSelected ? 2 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 4))
+            .onTapGesture {
+                if NSEvent.modifierFlags.contains(.shift) {
+                    guard case .single = unit else { return }
+                    store.toggleFilmstripSelection(unit.pageIDs[0])
+                } else {
+                    store.selectUnit(at: index)
+                }
             }
-        } label: {
-            PageUnitView(unit: unit, isInteractive: false)
-                .frame(width: unit.isSpread ? 96 : 48, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(isMultiSelected ? Color.orange : (isCurrent ? Color.accentColor : Color.secondary.opacity(0.3)), lineWidth: isCurrent || isMultiSelected ? 2 : 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            menuItems(for: unit)
-        }
-        .onDrag {
-            NSItemProvider(object: String(index) as NSString)
-        }
-        .onDrop(of: [.text], delegate: FilmstripDropDelegate(destinationIndex: index, store: store))
+            .contextMenu {
+                menuItems(for: unit)
+            }
+            .onDrag {
+                NSItemProvider(object: String(index) as NSString)
+            }
+            .onDrop(of: [.text], delegate: FilmstripDropDelegate(destinationIndex: index, store: store))
     }
 
     @ViewBuilder
