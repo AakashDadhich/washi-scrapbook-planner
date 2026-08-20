@@ -221,7 +221,6 @@ struct StickerElementContentView: View {
             if let sourceImage {
                 let img = Image(decorative: sourceImage, scale: 1)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
                 if let tint = sticker.tint {
                     img.colorMultiply(tint.color)
                 } else {

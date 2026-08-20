@@ -55,10 +55,20 @@ enum ImageLoader {
         return vectorImage(at: url)
     }
 
-    /// Rasterizes an SVG/PDF at its natural (untransformed) size via AppKit.
+    /// Rasterizes an SVG/PDF via AppKit, upscaling the proposed rect so the
+    /// longest side is at least `minRasterDimension` — starter clipart SVGs
+    /// declare a natural size as small as 100x100, which reads as soft once
+    /// a sticker is stretched to fill several centimeters of page. Never
+    /// scales down, so large source PDFs still rasterize at their own size.
+    private static let minRasterDimension: CGFloat = 800
+
     private static func vectorImage(at url: URL) -> CGImage? {
         guard let nsImage = NSImage(contentsOf: url) else { return nil }
-        var rect = CGRect(origin: .zero, size: nsImage.size)
+        let naturalSize = nsImage.size
+        let maxSide = max(naturalSize.width, naturalSize.height)
+        let scale = maxSide > 0 ? max(minRasterDimension / maxSide, 1) : 1
+        let rasterSize = CGSize(width: naturalSize.width * scale, height: naturalSize.height * scale)
+        var rect = CGRect(origin: .zero, size: rasterSize)
         return nsImage.cgImage(forProposedRect: &rect, context: nil, hints: nil)
     }
 
