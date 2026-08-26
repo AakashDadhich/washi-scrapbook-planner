@@ -26,6 +26,7 @@ struct WashiApp: App {
             // `UndoStack`, not an `NSUndoManager`). Replacing it with an
             // empty group removes the competing claimant.
             CommandGroup(replacing: .undoRedo) {}
+            ClipboardCommands()
             ArrangeCommands()
         }
     }
@@ -243,6 +244,26 @@ private struct EditorView: View {
         }
         .environmentObject(store)
         .background(Color.editorPaneBackground(for: colorScheme))
+        .focusedSceneValue(\.clipboardActions, ClipboardActions(
+            canCopy: store.canCopySelection,
+            canPaste: store.selectedPageID != nil && store.clipboardHasElements,
+            hasSelection: store.selectedPageID != nil && !store.selectedElementIDs.isEmpty,
+            copy: {
+                if let pageID = store.selectedPageID { store.copySelection(onPageID: pageID) }
+            },
+            cut: {
+                if let pageID = store.selectedPageID { store.cutSelection(onPageID: pageID) }
+            },
+            paste: {
+                if let pageID = store.selectedPageID { store.pasteFromClipboard(onPageID: pageID) }
+            },
+            delete: {
+                if let pageID = store.selectedPageID { store.deleteSelectedElements(onPageID: pageID) }
+            },
+            selectAll: {
+                if let pageID = store.selectedPageID { store.selectAllElements(onPageID: pageID) }
+            }
+        ))
         .focusedSceneValue(\.arrangeActions, ArrangeActions(
             hasSelection: store.selectedPageID != nil && !store.selectedElementIDs.isEmpty,
             bringToFront: {
@@ -366,13 +387,6 @@ private struct EditorView: View {
                 }
             }
             .keyboardShortcut("d", modifiers: [.command])
-
-            Button("") {
-                if let pageID = store.selectedPageID {
-                    store.selectAllElements(onPageID: pageID)
-                }
-            }
-            .keyboardShortcut("a", modifiers: [.command])
 
             Button("") { presentImagePicker() }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
