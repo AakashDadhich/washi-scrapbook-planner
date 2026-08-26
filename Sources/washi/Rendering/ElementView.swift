@@ -6,11 +6,17 @@ import SwiftUI
 /// know its own page-space geometry.
 struct ElementView: View {
     var element: PageElement
+    /// Points-per-cm of the page view this element is being drawn into.
+    /// Text is authored in point sizes calibrated against
+    /// `UnitConversion.pointsPerCm` (the print/PDF scale), so this is
+    /// needed to shrink glyphs to match when the same view tree is reused
+    /// at a much smaller scale, e.g. filmstrip thumbnails (issue #36).
+    var scale: CGFloat
 
     var body: some View {
         switch element.content {
         case .text(let text):
-            TextElementContentView(text: text)
+            TextElementContentView(text: text, scale: scale)
         case .image(let image):
             ImageElementContentView(image: image)
         case .sticker(let sticker):
@@ -39,7 +45,7 @@ struct PlacedElementView: View {
         let x = element.transform.position.x * scale
         let y = element.transform.position.y * scale
 
-        ElementView(element: element)
+        ElementView(element: element, scale: scale)
             .frame(width: w, height: h)
             .rotationEffect(.degrees(element.transform.rotationDegrees))
             .position(x: x, y: y)
@@ -89,6 +95,14 @@ struct BorderOverlay: View {
 
 struct TextElementContentView: View {
     var text: TextElement
+    /// Points-per-cm of the page view this text is being drawn into;
+    /// defaults to the print scale so PDF export (which already renders at
+    /// that scale) sees no change. See `ElementView.scale`.
+    var scale: CGFloat = UnitConversion.pointsPerCm
+
+    private var fontScale: CGFloat {
+        scale / UnitConversion.pointsPerCm
+    }
 
     var body: some View {
         ZStack {
@@ -96,11 +110,11 @@ struct TextElementContentView: View {
                 Rectangle().fill(bg.color)
             }
             Text(text.string)
-                .font(.custom(text.fontName, size: text.fontSize))
+                .font(.custom(text.fontName, size: text.fontSize * fontScale))
                 .foregroundStyle(text.textColor.color)
                 .multilineTextAlignment(swiftUIAlignment)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: frameAlignment)
-                .padding(4)
+                .padding(4 * fontScale)
                 .shadow(
                     color: text.shadow?.color.color ?? .clear,
                     radius: text.shadow?.radius ?? 0,
@@ -227,12 +241,15 @@ struct StickerElementContentView: View {
                     img
                 }
             } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill((sticker.tint ?? ColorValue(hex: "#E38FB0")).color.opacity(0.5))
-                    .overlay(
-                        Image(systemName: "star.fill")
-                            .foregroundStyle((sticker.tint ?? ColorValue(hex: "#E38FB0")).color)
-                    )
+                GeometryReader { geo in
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill((sticker.tint ?? ColorValue(hex: "#E38FB0")).color.opacity(0.5))
+                        .overlay(
+                            Image(systemName: "star.fill")
+                                .font(.system(size: min(geo.size.width, geo.size.height) * 0.5))
+                                .foregroundStyle((sticker.tint ?? ColorValue(hex: "#E38FB0")).color)
+                        )
+                }
             }
         }
         .task(id: sticker.assetID) {
