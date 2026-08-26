@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum ProjectFileError: Error {
     case manifestMissing
@@ -77,6 +78,42 @@ enum ProjectFile {
             contentHash: hash,
             originalFilename: sourceURL.lastPathComponent,
             pixelSize: pixelSize
+        )
+        project.assetManifest[id] = record
+        return record
+    }
+
+    /// Same dedupe-by-content-hash contract as `importAsset(from:…)`, but
+    /// for bytes already in memory — the paste path (issue #32), where the
+    /// asset arrives on the pasteboard rather than as a file on disk.
+    @discardableResult
+    static func importAsset(
+        data: Data,
+        originalFilename: String,
+        pixelSize: CGSize,
+        isClipartImport: Bool,
+        into project: inout Project,
+        packageURL: URL
+    ) throws -> AssetRecord {
+        let hash = ImageLoader.sha256Hex(of: data)
+        if let existing = project.assetManifest.values.first(where: { $0.contentHash == hash }) {
+            return existing
+        }
+
+        let id = UUID()
+        let ext = (originalFilename as NSString).pathExtension.isEmpty ? "dat" : (originalFilename as NSString).pathExtension
+        let relativePath = "\(assetsDirName)/\(id.uuidString).\(ext)"
+
+        try FileManager.default.createDirectory(at: assetsDirectory(in: packageURL), withIntermediateDirectories: true)
+        try data.write(to: packageURL.appendingPathComponent(relativePath), options: .atomic)
+
+        let record = AssetRecord(
+            id: id,
+            relativePath: relativePath,
+            contentHash: hash,
+            originalFilename: originalFilename,
+            pixelSize: pixelSize,
+            isClipartImport: isClipartImport
         )
         project.assetManifest[id] = record
         return record

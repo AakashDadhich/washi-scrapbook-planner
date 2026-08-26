@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 enum ProjectStoreError: Error {
     case noSaveLocation
@@ -85,6 +86,19 @@ final class ProjectStore: ObservableObject {
     private var autosaveTimer: Timer?
     private let autosaveInterval: TimeInterval = 120
 
+    /// Whether the system pasteboard currently holds Washi elements, so the
+    /// Edit menu's Paste item can be enabled/disabled rather than beeping
+    /// (issue #32). `NSPasteboard` posts no change notification, so this is
+    /// polled — cheaply, since `changeCount` is just an integer compare.
+    @Published private(set) var clipboardHasElements: Bool = false
+    private var clipboardTimer: Timer?
+    private let clipboardPollInterval: TimeInterval = 0.5
+    private var lastSeenClipboardChangeCount: Int = -1
+    /// How many times the pasteboard's *current* contents have already been
+    /// pasted, so a run of pastes cascades instead of stacking exactly on
+    /// top of itself. Reset whenever the pasteboard contents change.
+    var pasteRepeatCount: Int = 0
+
     init(project: Project, packageURL: URL? = nil, alreadySavedAt savedURL: URL? = nil) {
         self.project = project
         self.packageURL = packageURL ?? ProjectStore.makeScratchPackageURL(projectID: project.id)
@@ -95,6 +109,7 @@ final class ProjectStore: ObservableObject {
         try? fm.createDirectory(at: ProjectFile.assetsDirectory(in: self.packageURL), withIntermediateDirectories: true)
         try? fm.createDirectory(at: ProjectFile.thumbnailsDirectory(in: self.packageURL), withIntermediateDirectories: true)
         startAutosaveTimer()
+        startClipboardTimer()
     }
 
     static func makeScratchPackageURL(projectID: UUID) -> URL {
@@ -254,6 +269,25 @@ final class ProjectStore: ObservableObject {
 
     // MARK: - Autosave (spec §10.2, §14 edge case 13)
 
+    private func startClipboardTimer() {
+        clipboardTimer?.invalidate()
+        refreshClipboardAvailability()
+        clipboardTimer = Timer.scheduledTimer(withTimeInterval: clipboardPollInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshClipboardAvailability() }
+        }
+    }
+
+    /// Re-reads the pasteboard's `changeCount`; when it moved, something
+    /// else was copied (here or in another app) and the paste cascade
+    /// restarts from the first offset.
+    func refreshClipboardAvailability() {
+        let changeCount = NSPasteboard.general.changeCount
+        guard changeCount != lastSeenClipboardChangeCount else { return }
+        lastSeenClipboardChangeCount = changeCount
+        pasteRepeatCount = 0
+        clipboardHasElements = ElementClipboard.containsElements()
+    }
+
     private func startAutosaveTimer() {
         autosaveTimer?.invalidate()
         autosaveTimer = Timer.scheduledTimer(withTimeInterval: autosaveInterval, repeats: true) { [weak self] _ in
@@ -315,5 +349,6 @@ final class ProjectStore: ObservableObject {
 
     deinit {
         autosaveTimer?.invalidate()
+        clipboardTimer?.invalidate()
     }
 }
