@@ -6,17 +6,32 @@ import SwiftUI
 /// know its own page-space geometry.
 struct ElementView: View {
     var element: PageElement
+    /// Points-per-cm of the page view this element is being drawn into.
+    /// Fonts, borders, and shadows are authored in point values calibrated
+    /// against `UnitConversion.pointsPerCm` (the print/PDF scale), so this
+    /// is needed to shrink them to match when the same view tree is reused
+    /// at a much smaller scale, e.g. filmstrip thumbnails (issue #36).
+    var scale: CGFloat
+
+    /// Ratio between this view's scale and the print/PDF reference scale
+    /// those point values were authored against. 1 at the reference scale
+    /// (PDF export, and live canvas whenever it happens to render at
+    /// ~print scale); shrinks toward 0 for a much smaller page view like a
+    /// filmstrip thumbnail.
+    var contentScale: CGFloat {
+        scale / UnitConversion.pointsPerCm
+    }
 
     var body: some View {
         switch element.content {
         case .text(let text):
-            TextElementContentView(text: text)
+            TextElementContentView(text: text, scale: contentScale)
         case .image(let image):
-            ImageElementContentView(image: image)
+            ImageElementContentView(image: image, scale: contentScale)
         case .sticker(let sticker):
             StickerElementContentView(sticker: sticker)
         case .frame(let frame):
-            FrameElementContentView(frame: frame)
+            FrameElementContentView(frame: frame, scale: contentScale)
         }
     }
 }
@@ -39,7 +54,7 @@ struct PlacedElementView: View {
         let x = element.transform.position.x * scale
         let y = element.transform.position.y * scale
 
-        ElementView(element: element)
+        ElementView(element: element, scale: scale)
             .frame(width: w, height: h)
             .rotationEffect(.degrees(element.transform.rotationDegrees))
             .position(x: x, y: y)
@@ -64,23 +79,29 @@ private struct BorderShapePath: Shape {
 /// identical for a photo, a text box, and a standalone frame (spec §3.8).
 struct BorderOverlay: View {
     var border: BorderStyle
+    /// Ratio to the print/PDF reference scale the border's point values
+    /// (thickness, dash/gap lengths) were authored against — see
+    /// `ElementView.contentScale`. Defaults to 1 (no change) so PDF export
+    /// and any caller that doesn't reuse the view tree at another scale is
+    /// unaffected.
+    var scale: CGFloat = 1
 
     var body: some View {
         switch border.shape {
         case .dashed(let dashLength, let gapLength):
             BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
-                .stroke(border.color.color, style: StrokeStyle(lineWidth: border.thickness, dash: [dashLength, gapLength]))
+                .stroke(border.color.color, style: StrokeStyle(lineWidth: border.thickness * scale, dash: [dashLength * scale, gapLength * scale]))
         case .doubleLine(let gap):
             ZStack {
                 BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
-                    .stroke(border.color.color, lineWidth: border.thickness)
+                    .stroke(border.color.color, lineWidth: border.thickness * scale)
                 BorderShapePath(borderShape: .straight, cornerStyle: border.cornerStyle)
-                    .stroke(border.color.color, lineWidth: border.thickness)
-                    .padding(border.thickness + gap)
+                    .stroke(border.color.color, lineWidth: border.thickness * scale)
+                    .padding((border.thickness + gap) * scale)
             }
         default:
             BorderShapePath(borderShape: border.shape, cornerStyle: border.cornerStyle)
-                .stroke(border.color.color, lineWidth: border.thickness)
+                .stroke(border.color.color, lineWidth: border.thickness * scale)
         }
     }
 }
@@ -89,6 +110,10 @@ struct BorderOverlay: View {
 
 struct TextElementContentView: View {
     var text: TextElement
+    /// Ratio to the print/PDF reference scale `fontSize` and other point
+    /// values here were authored against — see `ElementView.contentScale`.
+    /// Defaults to 1 (no change) so PDF export is unaffected.
+    var scale: CGFloat = 1
 
     var body: some View {
         ZStack {
@@ -96,16 +121,16 @@ struct TextElementContentView: View {
                 Rectangle().fill(bg.color)
             }
             Text(text.string)
-                .font(.custom(text.fontName, size: text.fontSize))
+                .font(.custom(text.fontName, size: text.fontSize * scale))
                 .foregroundStyle(text.textColor.color)
                 .multilineTextAlignment(swiftUIAlignment)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: frameAlignment)
-                .padding(4)
+                .padding(4 * scale)
                 .shadow(
                     color: text.shadow?.color.color ?? .clear,
-                    radius: text.shadow?.radius ?? 0,
-                    x: text.shadow?.offsetX ?? 0,
-                    y: text.shadow?.offsetY ?? 0
+                    radius: (text.shadow?.radius ?? 0) * scale,
+                    x: (text.shadow?.offsetX ?? 0) * scale,
+                    y: (text.shadow?.offsetY ?? 0) * scale
                 )
         }
         .clipped()
@@ -131,7 +156,7 @@ struct TextElementContentView: View {
     @ViewBuilder
     private var borderOverlay: some View {
         if let border = text.border {
-            BorderOverlay(border: border)
+            BorderOverlay(border: border, scale: scale)
         }
     }
 }
@@ -141,6 +166,9 @@ struct TextElementContentView: View {
 struct ImageElementContentView: View {
     @EnvironmentObject var store: ProjectStore
     var image: ImageElement
+    /// See `ElementView.contentScale`. Defaults to 1 (no change) so PDF
+    /// export is unaffected.
+    var scale: CGFloat = 1
     @State private var sourceImage: CGImage?
 
     var body: some View {
@@ -166,9 +194,9 @@ struct ImageElementContentView: View {
         .overlay(borderOverlay)
         .shadow(
             color: image.shadow?.color.color ?? .clear,
-            radius: image.shadow?.radius ?? 0,
-            x: image.shadow?.offsetX ?? 0,
-            y: image.shadow?.offsetY ?? 0
+            radius: (image.shadow?.radius ?? 0) * scale,
+            x: (image.shadow?.offsetX ?? 0) * scale,
+            y: (image.shadow?.offsetY ?? 0) * scale
         )
         .task(id: image.assetID) {
             loadSourceImage()
@@ -191,7 +219,7 @@ struct ImageElementContentView: View {
     private var cornerShape: AnyShape {
         switch image.cornerStyle {
         case .sharp: return AnyShape(Rectangle())
-        case .rounded(let radius): return AnyShape(RoundedRectangle(cornerRadius: radius))
+        case .rounded(let radius): return AnyShape(RoundedRectangle(cornerRadius: radius * scale))
         case .circle: return AnyShape(Circle())
         }
     }
@@ -199,7 +227,7 @@ struct ImageElementContentView: View {
     @ViewBuilder
     private var borderOverlay: some View {
         if let border = image.border {
-            BorderOverlay(border: border)
+            BorderOverlay(border: border, scale: scale)
         }
     }
 
@@ -227,12 +255,15 @@ struct StickerElementContentView: View {
                     img
                 }
             } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill((sticker.tint ?? ColorValue(hex: "#E38FB0")).color.opacity(0.5))
-                    .overlay(
-                        Image(systemName: "star.fill")
-                            .foregroundStyle((sticker.tint ?? ColorValue(hex: "#E38FB0")).color)
-                    )
+                GeometryReader { geo in
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill((sticker.tint ?? ColorValue(hex: "#E38FB0")).color.opacity(0.5))
+                        .overlay(
+                            Image(systemName: "star.fill")
+                                .font(.system(size: min(geo.size.width, geo.size.height) * 0.5))
+                                .foregroundStyle((sticker.tint ?? ColorValue(hex: "#E38FB0")).color)
+                        )
+                }
             }
         }
         .task(id: sticker.assetID) {
@@ -250,13 +281,16 @@ struct StickerElementContentView: View {
 
 struct FrameElementContentView: View {
     var frame: FrameElement
+    /// See `ElementView.contentScale`. Defaults to 1 (no change) so PDF
+    /// export is unaffected.
+    var scale: CGFloat = 1
 
     var body: some View {
         ZStack {
             if let fill = frame.fill {
                 shape.fill(fill.color)
             }
-            BorderOverlay(border: frame.border)
+            BorderOverlay(border: frame.border, scale: scale)
         }
     }
 
